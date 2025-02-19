@@ -93,6 +93,21 @@ WSGI_APPLICATION = 'student_management_system.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
+import environ
+
+
+env = environ.Env()
+
+environ.Env.read_env()
+import dj_database_url
+
+
+DATABASES = {
+    'default': dj_database_url.parse(env('DATABASE_URL1'))
+}
+
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
