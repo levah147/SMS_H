@@ -1,137 +1,107 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
-{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
 {% block content %}
-
-<section class="content">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-12">
-                <!-- general form elements -->
-                    <form method="POST">
-                        {% csrf_token %}
-                <div class="card card-primary">
-                    <div class="card-header">
-                        <h3 class="card-title">{{page_title}}</h3>
-                    </div>
-
-       
-                    <!-- /.card-header -->
-                    <!-- form start -->
-                    <div class="card-body">
-
-
-                     
-
-                 {{ form }}
-
-                    </div>
-                    <!-- /.card-body -->
-
-                    <div class="card-footer">
-                        <button type="submit" id='update_result' class="btn btn-primary btn-block">Update Result</button>
-               
-                    </div>
-                </form>
-                </div>
-                <!-- /.card -->
-
-            </div>
-        </div>
+<!-- Display messages if any -->
+{% comment %} {% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-</section>
-{% endblock content %}
+  {% endfor %}
+{% endif %} {% endcomment %}
 
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card">
+      <!-- Header Section -->
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <img src="{% static 'dist/img/2.png' %}" alt="School Logo" style="max-height: 60px;">
+        </div>
+        <div class="text-center flex-grow-1">
+            <h3 class="card-title mb-0">Edit Student Result</h3>
+            {% if student and student.admin %}
+              <p class="text-muted">
+                {{ student.admin.first_name }} {{ student.admin.last_name }} &mdash; Admission: {{ student.admin.email }}
+              </p>
+            {% else %}
+              <p class="text-muted">Student information not available.</p>
+            {% endif %}
+          </div>
+          
+        <div class="no-print">
+          {% comment %} <a href="{% url 'staff_result_detail' student.id %}" class="btn btn-secondary">Cancel</a> {% endcomment %}
+        </div>
+      </div>
+      <!-- Form Section -->
+      <div class="card-body">
+        <form method="POST" id="editResultForm">
+          {% csrf_token %}
+          <!-- Display non-field errors -->
+          {{ form.non_field_errors }}
+          
+          <div class="form-group mb-3">
+            <label for="{{ form.ca_test1.id_for_label }}">CA Test 1 (0–30)</label>
+            {{ form.ca_test1 }}
+          </div>
+          <div class="form-group mb-3">
+            <label for="{{ form.ca_test2.id_for_label }}">CA Test 2 (0–10)</label>
+            {{ form.ca_test2 }}
+          </div>
+          <div class="form-group mb-3">
+            <label for="{{ form.exam_score.id_for_label }}">Exam Score (0–60)</label>
+            {{ form.exam_score }}
+          </div>
+          <!-- Optional: Display computed total score -->
+          <div class="form-group mb-3">
+            <label>Total Score</label>
+            <input type="number" class="form-control" id="totalScore" readonly>
+          </div>
+          
+          <div class="text-center mt-4">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
 
 {% block custom_js %}
 <script>
-    $(document).ready(function () {
-        $("#id_subject").change(function () {
-            fetchStudents();
-            });
-            $("#id_session_year").change(function () {
-                fetchStudents();
-                });
-   $("#id_student").change(function () {
-    fetch_student_result();
-                });
-                $("#id_exam").hide()
-                $("#id_test").hide()
-                $("#update_result").hide()
-                $('label[for="id_test"]').hide();
-                $('label[for="id_exam"]').hide();
-        function fetchStudents(){
-            var subject = $("#id_subject").val()
-            var session = $("#id_session_year").val()
-            $("#id_student").html(null)
-            if (session.length  == 0 || subject.length == 0 || session < 1 || subject < 1){
-                return false;
-            }
-            $.ajax({
-                url: "{% url 'get_students' %}",
-                type: 'POST',
-                data: {
-                    subject: subject,
-                    session:session
-                }
-            }).done(function (response) {
-                var json_data = JSON.parse(response)
-                if (json_data.length < 1) {
-                    alert("No data to display")
-                } else {
-                    var div_data = "<option>Select Student</option>"
+document.addEventListener('DOMContentLoaded', function() {
+    // Get references to the result fields from the form.
+    const caTest1Input = document.querySelector('[name="{{ form.ca_test1.name }}"]');
+    const caTest2Input = document.querySelector('[name="{{ form.ca_test2.name }}"]');
+    const examInput    = document.querySelector('[name="{{ form.exam_score.name }}"]');
+    const totalScore   = document.getElementById("totalScore");
 
-                    for (key in json_data) {
-                        div_data += "<option value='" + json_data[key]['id'] + "'>" + json_data[key]['name'] + " </option>"
-                    }
-             
-                    $("#id_student").html(div_data)
-                }
-            }).fail(function (response) {
-                alert("Error in fetching students")
-            })
-               }
+    function calculateTotal() {
+        const ca1 = parseFloat(caTest1Input.value) || 0;
+        const ca2 = parseFloat(caTest2Input.value) || 0;
+        const exam = parseFloat(examInput.value) || 0;
+        
+        // Enforce maximum values (if user bypasses the input min/max)
+        if (ca1 > 30) caTest1Input.value = 30;
+        if (ca2 > 10) caTest2Input.value = 10;
+        if (exam > 60) examInput.value = 60;
+        
+        // Compute total as the sum of CA Test 1, CA Test 2, and Exam Score.
+        const total = ca1 + ca2 + exam;
+        totalScore.value = total.toFixed(2);
+    }
 
-               function fetch_student_result(){
-                var student = $("#id_student").val()
-                var subject = $("#id_subject").val()
-                $("#id_test").val(null)
-                $("#id_exam").val(null)
-                $("#id_exam").hide()
-                $("#update_result").hide()
-                $("#id_test").hide()
-                $('label[for="id_test"]').hide();
-                $('label[for="id_exam"]').hide();
-                if (student.length  == 0 || subject.length == 0 || student < 1 || subject < 1){
-                    return false;
-                }
-                $.ajax({
-                    url: "{% url 'fetch_student_result' %}",
-                    type: 'POST',
-                    data: {
-                        subject: subject,
-                        student:student
-                    }
-                }).done(function (response) {
-                    if (response == 'False') {
-                        alert("No data to display")
-                    } else {
-                        var json_data = JSON.parse(response)
-                        
-                            $("#id_test").val(json_data['test'])
-                            $("#id_exam").val(json_data['exam'])
-                            $("#id_exam").show()
-                            $("#id_test").show()
-                            $("#update_result").show()
-                            $('label[for="id_test"]').show();
-                            $('label[for="id_exam"]').show();
+    [caTest1Input, caTest2Input, examInput].forEach(input => {
+        input.addEventListener('input', calculateTotal);
+    });
 
-                    }
-                }).fail(function (response) {
-                    alert("Error in fetching students")
-                })
-               }
-
-    })
+    // Initialize the total on page load.
+    calculateTotal();
+});
 </script>
 {% endblock custom_js %}

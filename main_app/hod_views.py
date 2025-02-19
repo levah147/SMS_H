@@ -139,28 +139,29 @@ def add_subject(request):
     }
     if request.method == 'POST':
         if form.is_valid():
+            # Use 'program' instead of 'course'
             name = form.cleaned_data.get('name')
-            course = form.cleaned_data.get('course')
+            program = form.cleaned_data.get('program')  # updated field
             staff = form.cleaned_data.get('staff')
             try:
                 subject = Subject()
                 subject.name = name
                 subject.staff = staff
-                subject.course = course
+                subject.program = program  # assign to 'program'
                 subject.save()
                 messages.success(request, "Successfully Added")
                 return redirect(reverse('add_subject'))
-
             except Exception as e:
                 messages.error(request, "Could Not Add " + str(e))
         else:
             messages.error(request, "Fill Form Properly")
-
     return render(request, 'hod_template/add_subject_template.html', context)
 
 
+
 def manage_staff(request):
-    allStaff = CustomUser.objects.filter(user_type=2)
+    allStaff = CustomUser.objects.filter(user_type=2, staff__isnull=False)
+
     context = {
         'allStaff': allStaff,
         'page_title': 'Manage Staff'
@@ -169,12 +170,15 @@ def manage_staff(request):
 
 
 def manage_student(request):
-    students = CustomUser.objects.filter(user_type=3)
+    students = CustomUser.objects.filter(user_type=3, student__isnull=False)
+    for student in students:
+        student.has_result = ResultSummary.objects.filter(student=student.student).exists()
     context = {
         'students': students,
         'page_title': 'Manage Students'
     }
     return render(request, "hod_template/manage_student.html", context)
+
 
 
 def manage_course(request):

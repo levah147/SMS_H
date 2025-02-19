@@ -1,12 +1,12 @@
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import UserManager
+from django.contrib.auth.models import UserManager, AbstractUser
+from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.dispatch import receiver
 from django.db.models.signals import post_save
-from django.db import models
-from django.contrib.auth.models import AbstractUser
+from decimal import Decimal
 
-
-
+# ---------- Custom User and Related Models ----------
 
 class CustomUserManager(UserManager):
     def _create_user(self, email, password, **extra_fields):
@@ -24,7 +24,6 @@ class CustomUserManager(UserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-
         assert extra_fields["is_staff"]
         assert extra_fields["is_superuser"]
         return self._create_user(email, password, **extra_fields)
@@ -42,8 +41,8 @@ class CustomUser(AbstractUser):
     USER_TYPE = ((1, "HOD"), (2, "Staff"), (3, "Student"))
     GENDER = [("M", "Male"), ("F", "Female")]
     
-    
-    username = None  # Removed username, using email instead
+    # Remove username; we'll use email as the unique identifier.
+    username = None  
     email = models.EmailField(unique=True)
     user_type = models.CharField(default=1, choices=USER_TYPE, max_length=1)
     gender = models.CharField(max_length=1, choices=GENDER)
@@ -64,7 +63,6 @@ class Admin(models.Model):
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
 
 
-
 class Program(models.Model):
     name = models.CharField(max_length=120)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -76,25 +74,25 @@ class Program(models.Model):
 
 class Student(models.Model):
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    course = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
     session = models.ForeignKey(Session, on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
         return self.admin.last_name + ", " + self.admin.first_name
-    
+
 
 class Staff(models.Model):
-    course = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.admin.last_name + " " + self.admin.first_name
-    
+
 
 class Subject(models.Model):
     name = models.CharField(max_length=120)
-    staff = models.ForeignKey(Staff,on_delete=models.CASCADE,)
-    course = models.ForeignKey(Program, on_delete=models.CASCADE)
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
+    program = models.ForeignKey(Program, on_delete=models.CASCADE)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -166,14 +164,89 @@ class NotificationStudent(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class StudentResult(models.Model):
+# ---------- Updated Result Module ----------
+
+# Replace the previous StudentResult with an updated Result model
+class Result(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
-    test = models.FloatField(default=0)
-    exam = models.FloatField(default=0)
+    ca_test1 = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(30)]
+    )
+    ca_test2 = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(10)]
+    )
+    exam_score = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(60)]
+    )
+    total_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['student', 'subject']
+    
+    def calculate_total(self):
+        # Total Score = CA Test 1 + CA Test 2 + Exam Score
+        return self.ca_test1 + self.ca_test2 + self.exam_score
+    
+    def save(self, *args, **kwargs):
+        self.total_score = self.calculate_total()
+        super().save(*args, **kwargs)
+    
+    @property
+    def grade(self):
+        total = self.total_score
+        if total >= Decimal('90'):
+            return 'A+'
+        elif total >= Decimal('80'):
+            return 'A'
+        elif total >= Decimal('70'):
+            return 'B'
+        elif total >= Decimal('60'):
+            return 'C'
+        elif total >= Decimal('50'):
+            return 'D'
+        else:
+            return 'F'
+    
+    def __str__(self):
+        return f"{self.student.admin.last_name}, {self.student.admin.first_name} - {self.subject.name}: {self.total_score}"
 
+
+class ResultSummary(models.Model):
+    student = models.OneToOneField(Student, on_delete=models.CASCADE)
+    total_score = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    average_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    position = models.IntegerField(default=0)
+    grade = models.CharField(max_length=2, default='F')
+    teacher_remarks = models.TextField(blank=True)
+    
+    def calculate_grade(self):
+        avg = float(self.average_score)
+        if avg >= 90:
+            return 'A+'
+        elif avg >= 80:
+            return 'A'
+        elif avg >= 70:
+            return 'B'
+        elif avg >= 60:
+            return 'C'
+        elif avg >= 50:
+            return 'D'
+        else:
+            return 'F'
+    
+    def __str__(self):
+        return (f"Result Summary for {self.student.admin.last_name}, "
+                f"{self.student.admin.first_name}: Avg {self.average_score}, "
+                f"Pos {self.position}, Grade {self.grade}")
+
+
+# ---------- Signals for Profile Creation ----------
 
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):

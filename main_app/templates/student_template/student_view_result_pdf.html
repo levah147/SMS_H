@@ -5,29 +5,25 @@
 
 {% block content %}
 <div class="container mt-5">
-  <div class="card">
+  <div class="card border-0">
     <!-- Header Section -->
-    <div class="card-header d-flex align-items-center justify-content-between">
-      <div>
-        <img src="{% static 'dist/img/2.png' %}" alt="School Logo" style="max-height: 120px;">
-      </div>
-      <div class="text-center flex-grow-1">
+    <div class="card-header text-center">
+      <div class="d-flex justify-content-center align-items-center mb-2">
+        <!-- School Logo -->
+        <img src="{% static 'dist/img/2.png' %}" alt="School Logo" style="max-height: 120px; margin-right: 20px;">
+        <!-- Student Profile Image -->
         {% if request.user.profile_pic %}
-        <img src="{{ request.user.profile_pic}}" alt="Student Image" style="max-height: 120px;">
-      {% else %}
-        <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" style="max-height: 120px;">
-      {% endif %}
+          <img src="{{ request.user.profile_pic}}" alt="Student Image" style="max-height: 120px;">
+        {% else %}
+          <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" style="max-height: 120px;">
+        {% endif %}
       </div>
-      <div class="no-print">
-        
-        <a href="{% url 'student_result_pdf' %}" target="_blank" class="btn btn-primary">Print PDF</a>
-      </div>
+      <h3 class="mt-2">Result Details for: {{ student.admin.first_name }} {{ student.admin.last_name }}</h3>
+
+      <p class="text-muted">Session: {{ student.session }}</p>
     </div>
     <!-- Card Body -->
     <div class="card-body">
-        {% comment %} <h3 class="card-title mb-0">My Result Detail</h3> {% endcomment %}
-        <p class="text-muted">Student Name: {{ student.admin.first_name }} {{ student.admin.last_name }}</p>
-        <p class="text-muted">Session: {{ student.session }}</p>
       {% if summary and summary.total_score|floatformat:"2" != "0.00" %}
         <h4>Result Summary</h4>
         <p><strong>Total Score:</strong> {{ summary.total_score }}</p>
@@ -35,8 +31,13 @@
         <p><strong>Position:</strong> {{ summary.position }}</p>
         <p><strong>Grade:</strong> {{ summary.grade }}</p>
         <p><strong>Teacher's Remarks:</strong> {{ summary.teacher_remarks }}</p>
+        <div class="no-print">
+            <img src="{{ request.user.profile_pic}}" alt="Student Image" style="max-height: 120px;">
+        
+            <a href="{% url 'student_result_pdf' %}" target="_blank" class="btn btn-primary">Print PDF</a>
+          </div>
       {% else %}
-        <p class="text-warning">No summary available.</p>
+        <p class="text-warning">No summary available for this student.</p>
       {% endif %}
       <hr>
       <h4>Subject Results</h4>
@@ -68,9 +69,11 @@
           </table>
         </div>
       {% else %}
-        <p>No subject results available.</p>
+        <p>No subject results available for this student.</p>
       {% endif %}
     </div>
   </div>
 </div>
 {% endblock content %}
+
+{% block footer %}{% endblock footer %}

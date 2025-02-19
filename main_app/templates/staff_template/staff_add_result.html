@@ -1,111 +1,141 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
-{% block page_title %}{{page_title}}{% endblock page_title %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
 {% block content %}
-
-<section class="content">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-12">
-                <!-- general form elements -->
-                    <form method="POST">
-                        {% csrf_token %}
-                <div class="card card-primary">
-                    <div class="card-header">
-                        <h3 class="card-title">{{page_title}}</h3>
-                    </div>
-
-       
-                    <!-- /.card-header -->
-                    <!-- form start -->
-                    <div class="card-body">
-
-
-                        <div class="form-group">
-                            <label>Subject</label>
-                            <select name="subject" class="form-control" id='subject'>
-                                <option value="">----</option>
-                                {% for subject in subjects  %}
-                                <option value="{{subject.id}}">{{subject.name}}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-
-                        <div class="form-group">
-                            <label>Session Year</label>
-                            <select name="session" id='session' class="form-control">
-                                <option value="">----</option>
-                                {% for session in sessions  %}
-                                <option value="{{session.id}}">{{session}} </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-
-                    </div>
-                    <!-- /.card-body -->
-
-                    <div class="card-footer">
-                        <button type="button" id='fetch_student' class="btn btn-primary btn-block">Fetch
-                            Students</button>
-                        <div class="form-group" id="student_data">
-
-                        </div>
-                    </div>
-                </form>
-                </div>
-                <!-- /.card -->
-
-            </div>
-        </div>
+<!-- Display messages -->
+{% comment %} {% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-</section>
-{% endblock content %}
+  {% endfor %}
+{% endif %} {% endcomment %}
 
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <img src="{% static 'dist/img/2.png' %}" alt="School Logo" style="max-height: 60px;">
+        </div>
+        <div class="text-center flex-grow-1">
+          <h3 class="card-title mb-0">Add Results</h3>
+          <p class="text-muted">Select a student and enter their scores</p>
+        </div>
+        <div class="no-print">
+          {# Optionally, add a Cancel button here if desired #}
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="POST" id="resultForm">
+          {% csrf_token %}
+          <!-- Student Dropdown -->
+          <div class="form-group mb-3">
+            <label for="student">Select Student</label>
+            <select name="student" id="student" class="form-control" required>
+              <option value="">-- Select Student --</option>
+              {% for student in students %}
+                  <option value="{{ student.id }}">{{ student.admin.first_name }} {{ student.admin.last_name }}</option>
+              {% endfor %}
+          </select>
+          
+          </div>
+          
+          <!-- Subject Results Table -->
+          <div class="table-responsive">
+            <table class="table table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Subject</th>
+                  <th>CA Test 1 (0–30)</th>
+                  <th>CA Test 2 (0–10)</th>
+                  <th>Exam (0–60)</th>
+                  <th>Total Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for subject in subjects %}
+                <tr class="subject-row">
+                  <td>
+                    {{ subject.name }}
+                    <input type="hidden" name="subject_{{ subject.id }}" value="{{ subject.id }}">
+                  </td>
+                  <td>
+                    <input type="number" class="form-control ca1" name="ca_test1_{{ subject.id }}" min="0" max="30" step="0.01" required>
+                  </td>
+                  <td>
+                    <input type="number" class="form-control ca2" name="ca_test2_{{ subject.id }}" min="0" max="10" step="0.01" required>
+                  </td>
+                  <td>
+                    <input type="number" class="form-control exam" name="exam_{{ subject.id }}" min="0" max="60" step="0.01" required>
+                  </td>
+                  <td>
+                    <input type="number" class="form-control total" readonly>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Teacher's Remarks -->
+          <div class="remarks-section mt-4">
+            <h4>Teacher's Remarks</h4>
+            <textarea name="teacher_remarks" class="form-control" rows="4" placeholder="Enter remarks about the student's performance..." required></textarea>
+          </div>
+
+          <!-- Save Button -->
+          <div class="text-center mt-4">
+            <button type="submit" class="btn btn-primary">Save Results</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
 
 {% block custom_js %}
 <script>
-    $(document).ready(function () {
-
-       
-        $("#fetch_student").click(function () {
-            var subject = $("#subject").val()
-            var session = $("#session").val()
-            $("#student_data").html(null)
-if (subject.length  == 0 || session.length == 0){
-    alert("Please select session and subject");
-    return false;
-}
-            $.ajax({
-                url: "{% url 'get_students' %}",
-                type: 'POST',
-                data: {
-                    subject: subject,
-                    session: session
-                }
-            }).done(function (response) {
-                var json_data = JSON.parse(response)
-                if (json_data.length < 1) {
-                    alert("No data to display")
-                } else {
-                    var div_data = "<hr/><div class='form-group'> <label> Student List</label> <select class='student_list form-control' name='student_list'> "
-
-                    for (key in json_data) {
-                        div_data += "<option value='" + json_data[key]['id'] + "'>" + json_data[key]['name'] + " </option>"
-                    }
-                    div_data += "</select></div>"
-                    div_data += "<div class='form-group row'> <div class='col-md-6'> <label> Test Score </label> <input class='form-control' name='test' placeholder='Test Score' max='40' min='0' required type='number' /></div><div class='col-md-6'><label> Exam Score </label>  <input class='form-control' placeholder='Exam Score'  name='exam' max='60' min='0' required type='number' /> </div></div><div class='form-group'><button id='save_attendance' class='btn btn-success' type='submit'>Save Result</button></div></div>"
-                    $("#student_data").html(div_data)
-                }
-            }).fail(function (response) {
-                alert("Error in fetching students")
-            })
-
-
-
-
-        })
-    })
+document.addEventListener('DOMContentLoaded', function() {
+    // Attach input event listeners on each subject row
+    const rows = document.querySelectorAll('.subject-row');
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input[type="number"]:not([readonly])');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => calculateTotal(row));
+        });
+    });
+    
+    function calculateTotal(row) {
+        const ca1 = parseFloat(row.querySelector('.ca1').value) || 0;
+        const ca2 = parseFloat(row.querySelector('.ca2').value) || 0;
+        const exam = parseFloat(row.querySelector('.exam').value) || 0;
+        // Enforce maximums
+        if (ca1 > 30) row.querySelector('.ca1').value = 30;
+        if (ca2 > 10) row.querySelector('.ca2').value = 10;
+        if (exam > 60) row.querySelector('.exam').value = 60;
+        const total = ca1 + ca2 + exam;
+        row.querySelector('.total').value = total.toFixed(2);
+    }
+    
+    // Optional: Validate before form submission
+    document.getElementById('resultForm').addEventListener('submit', function(e) {
+        let isValid = true;
+        const rows = document.querySelectorAll('.subject-row');
+        rows.forEach(row => {
+            const total = parseFloat(row.querySelector('.total').value) || 0;
+            if (total > 100) {
+                isValid = false;
+                alert('Total score cannot exceed 100 for any subject.');
+            }
+        });
+        if (!isValid) e.preventDefault();
+    });
+});
 </script>
 {% endblock custom_js %}

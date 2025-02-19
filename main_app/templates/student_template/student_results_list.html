@@ -1,0 +1,41 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Results List</h2>
+    {% if students %}
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="thead-light">
+                <tr>
+                    <th>Student Name</th>
+                    <th>Admission Number</th>
+                    <th>Program</th>
+                    <th>Session</th>
+                    <!-- Removed the Result Status column -->
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
+                    <td>{{ student.admin.email }}</td>
+                    <td>{{ student.program.name }}</td>
+                    <td>{{ student.session }}</td>
+                    <td>
+                        <a href="{% url 'student_view_result' student.id %}" class="btn btn-sm btn-primary">View Result</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p>No students found for your assigned program.</p>
+    {% endif %}
+</div>
+{% endblock content %}
