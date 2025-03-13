@@ -1,22 +1,24 @@
 import json
 import math
+import os
 from datetime import datetime
 
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.views.decorators.csrf import csrf_exempt
+# IMPORTANT: Import static so we can use it in our view.
+from django.templatetags.static import static
 
-from .forms import (LeaveReportStudentForm, FeedbackStudentForm, StudentEditForm)
-from .models import (Student, Attendance, AttendanceReport, Session, NotificationStudent,
-                     Result, ResultSummary, Subject, Program, LeaveReportStudent, FeedbackStudent)
-
+from .forms import LeaveReportStudentForm, FeedbackStudentForm, StudentEditForm
+from .models import (
+    Student, Attendance, AttendanceReport, Session, NotificationStudent,
+    Result, ResultSummary, Subject, Program, LeaveReportStudent, FeedbackStudent
+)
 
 def student_home(request):
     student = get_object_or_404(Student, admin=request.user)
-    # Count total subjects based on student's course (Program)
     total_subject = Subject.objects.filter(program=student.program).count()
     total_attendance = AttendanceReport.objects.filter(student=student).count()
     total_present = AttendanceReport.objects.filter(student=student, status=True).count()
@@ -87,7 +89,7 @@ def student_view_attendance(request):
                     "status": report.status
                 }
                 json_data.append(data)
-            return JsonResponse(json.dumps(json_data), safe=False)
+            return JsonResponse(json_data, safe=False)
         except Exception as e:
             return HttpResponse("Error: " + str(e))
 
@@ -156,7 +158,7 @@ def student_view_profile(request):
                     admin.set_password(password)
                 if passport:
                     fs = FileSystemStorage()
-                    filename = fs.save(passport.name, passport)
+                    filename = fs.save(os.path.basename(passport.name), passport)
                     passport_url = fs.url(filename)
                     admin.profile_pic = passport_url
                 admin.first_name = first_name
@@ -177,10 +179,10 @@ def student_view_profile(request):
 @csrf_exempt
 def student_fcmtoken(request):
     token = request.POST.get('token')
-    student_user = get_object_or_404(CustomUser, id=request.user.id)
+    student_obj = get_object_or_404(Student, admin=request.user)
     try:
-        student_user.fcm_token = token
-        student_user.save()
+        student_obj.admin.fcm_token = token
+        student_obj.admin.save()
         return HttpResponse("True")
     except Exception as e:
         return HttpResponse("False")
@@ -189,11 +191,62 @@ def student_fcmtoken(request):
 def student_view_notification(request):
     student = get_object_or_404(Student, admin=request.user)
     notifications = NotificationStudent.objects.filter(student=student)
+    # Mark all notifications as read:
+    notifications.update(is_read=True)
     context = {
         'notifications': notifications,
         'page_title': "View Notifications"
     }
     return render(request, "student_template/student_view_notification.html", context)
+
+
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def ajax_student_notifications(request):
+    student = request.user.student  # Assumes a reverse relation exists.
+    # Only fetch notifications that are not read.
+    notifications = NotificationStudent.objects.filter(student=student, is_read=False)
+    data = [{'id': n.id, 'message': n.message} for n in notifications]
+    return JsonResponse(data, safe=False)
+
+# @csrf_exempt
+# def ajax_get_notifications_student(request):
+#     student = get_object_or_404(Student, admin=request.user)
+#     # (Optionally, filter by unread notifications if you add an "is_read" field.)
+#     notifications = NotificationStudent.objects.filter(student=student)
+#     data = [{'id': n.id, 'message': n.message} for n in notifications]
+#     return JsonResponse(data, safe=False)
+
+# @csrf_exempt
+# def ajax_mark_notifications_read_student(request):
+#     student = get_object_or_404(Student, admin=request.user)
+#     # If you add an "is_read" field to NotificationStudent:
+#     notifications = NotificationStudent.objects.filter(student=student, is_read=False)
+#     notifications.update(is_read=True)
+#     return JsonResponse({'status': 'success'})
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import NotificationStudent
+
+@csrf_exempt
+def ajax_get_notifications_student(request):
+    student = get_object_or_404(Student, admin=request.user)
+    notifications = NotificationStudent.objects.filter(student=student, is_read=False)
+    data = {
+        'notifications': [{'id': n.id, 'message': n.message, 'type': 'Student'} for n in notifications],
+        'unread_count': notifications.count()
+    }
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def ajax_mark_notifications_read_student(request):
+    student = get_object_or_404(Student, admin=request.user)
+    NotificationStudent.objects.filter(student=student, is_read=False).update(is_read=True)
+    return JsonResponse({'status': 'success'})
+
+
 
 def student_view_result(request, student_id):
     student = get_object_or_404(Student, id=student_id)
@@ -211,40 +264,59 @@ def student_view_result(request, student_id):
     return render(request, "student_template/student_view_result.html", context)
 
 
-
+from django.shortcuts import get_object_or_404, render, redirect, reverse
+from .models import Student, Result, Session, Term
+from django.contrib import messages
 
 def student_results_list(request):
-    """
-    List the logged‑in student's result details.
-    Since a student should only see their own result,
-    we retrieve their Student record and pass it as a one-element queryset.
-    """
-    # Retrieve the student object for the logged‑in user.
     student = get_object_or_404(Student, admin=request.user)
+    sessions = Session.objects.all()
+    terms = Term.objects.all()
     
-    # Create a queryset containing just this student.
-    students = Student.objects.filter(id=student.id)
+    # Read selected session and term from GET parameters.
+    selected_session_id = request.GET.get('session', '')
+    selected_term_id = request.GET.get('term', '')
+    
+    results = None
+    if selected_session_id and selected_term_id:
+        session = get_object_or_404(Session, id=selected_session_id)
+        term = get_object_or_404(Term, id=selected_term_id, session=session)
+        results = Result.objects.filter(student=student, term=term)
     
     context = {
-        'students': students,
-        'page_title': 'Results List',
+        'student': student,
+        'sessions': sessions,
+        'terms': terms,
+        'selected_session_id': selected_session_id,
+        'selected_term_id': selected_term_id,
+        'results': results,
+        'page_title': 'My Results',
     }
     return render(request, "student_template/student_results_list.html", context)
 
 
 
 
+
+from django.http import JsonResponse
+from .models import Term
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def get_terms(request):
+    session_id = request.POST.get('session')
+    if session_id:
+        terms = Term.objects.filter(session_id=session_id)
+        data = [{'id': term.id, 'name': term.name} for term in terms]
+        return JsonResponse(data, safe=False)
+    return JsonResponse([], safe=False)
+
 from weasyprint import HTML, CSS
 from django.template.loader import get_template
 
 def student_result_pdf(request):
-    # Retrieve the logged-in student using the related CustomUser (admin)
     student = get_object_or_404(Student, admin=request.user)
-    
-    # Retrieve all results for the student.
     results = Result.objects.filter(student=student)
-    
-    # Get or create the ResultSummary for the student.
     summary, created = ResultSummary.objects.get_or_create(
         student=student,
         defaults={
@@ -256,21 +328,24 @@ def student_result_pdf(request):
         }
     )
     
+    # Compute absolute URL for the profile image.
+    if student.admin.profile_pic:
+        profile_pic_absolute = request.build_absolute_uri(student.admin.profile_pic.url)
+    else:
+        profile_pic_absolute = request.build_absolute_uri(static('dist/img/avatar5.png'))
+    
     context = {
         'student': student,
         'results': results,
         'summary': summary,
         'page_title': "My Result Detail",
+        'profile_pic_absolute': profile_pic_absolute,
+        'request': request,  # ensure static tag resolves correctly
     }
     
-    # Load the PDF template (create this template as described below)
     template = get_template("student_template/student_view_result_pdf.html")
     html_string = template.render(context)
-    
-    # Set base_url so that static files are resolved properly.
     base_url = request.build_absolute_uri('/')
-    
-    # Define CSS with a watermark (stamp) and to hide any footer if desired.
     css_string = """
     @page { size: A4; margin: 10mm; }
     body footer { display: none; }
@@ -286,11 +361,70 @@ def student_result_pdf(request):
     }
     """
     css = CSS(string=css_string)
-    
-    # Generate PDF with WeasyPrint.
     html = HTML(string=html_string, base_url=base_url)
     pdf_file = html.write_pdf(stylesheets=[css])
-    
     response = HttpResponse(pdf_file, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="result_{student.id}.pdf"'
     return response
+
+
+
+from django.shortcuts import get_object_or_404, render, redirect, reverse
+from django.contrib import messages
+from .models import Student, Result, Session, Term
+from decimal import Decimal
+
+def student_result_detail_filtered(request):
+    # Retrieve the logged‑in student.
+    student = get_object_or_404(Student, admin=request.user)
+    
+    # Get session and term IDs from GET parameters.
+    session_id = request.GET.get('session')
+    term_id = request.GET.get('term')
+    
+    if not (session_id and term_id):
+        messages.error(request, "Please select both an academic session and a term.")
+        return redirect(reverse('student_results_list'))
+    
+    # Retrieve the session and term objects.
+    session = get_object_or_404(Session, id=session_id)
+    term = get_object_or_404(Term, id=term_id, session=session)
+    
+    # Retrieve results for the student filtered by the selected term.
+    results = Result.objects.filter(student=student, term=term)
+    
+    # Compute summary: total score, average score, and grade.
+    total_score = sum(result.total_score for result in results)
+    num_subjects = results.count()
+    average_score = total_score / num_subjects if num_subjects > 0 else 0
+
+    if average_score >= 90:
+        grade = 'A+'
+    elif average_score >= 80:
+        grade = 'A'
+    elif average_score >= 70:
+        grade = 'B'
+    elif average_score >= 60:
+        grade = 'C'
+    elif average_score >= 50:
+        grade = 'D'
+    else:
+        grade = 'F'
+    
+    # Build a summary dictionary.
+    summary = {
+        'total_score': total_score,
+        'average_score': round(average_score, 2),
+        'grade': grade,
+        'teacher_remarks': '',  # Adjust if you store remarks elsewhere.
+    }
+    
+    context = {
+        'student': student,
+        'results': results,
+        'summary': summary,
+        'session': session,
+        'term': term,
+        'page_title': "Filtered Result Detail",
+    }
+    return render(request, "student_template/student_result_detail_filtered.html", context)

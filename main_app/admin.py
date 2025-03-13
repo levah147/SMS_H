@@ -4,7 +4,7 @@ from .models import (
     CustomUser, Admin, Staff, Student, Program, Subject, Session,
     Attendance, AttendanceReport, LeaveReportStudent, LeaveReportStaff,
     FeedbackStudent, FeedbackStaff, NotificationStaff, NotificationStudent,
-    Result, ResultSummary
+    Result, ResultSummary,Term
 )
 from django.contrib.auth.models import Group
 
@@ -52,6 +52,12 @@ class SessionProxy(Session):
         proxy = True
         verbose_name = "Session"
         verbose_name_plural = "Sessions"
+        # Term
+class TermProxy(Term):
+    class Meta:
+        proxy = True
+        verbose_name = "Term"
+        verbose_name_plural = "Terms"
 
 class ResultProxy(Result):
     class Meta:
@@ -147,6 +153,8 @@ admin.site.register(StudentProxy)
 admin.site.register(ProgramProxy)
 admin.site.register(SubjectProxy)
 admin.site.register(SessionProxy)
+admin.site.register(TermProxy)
+# Term
 admin.site.register(AttendanceProxy)
 admin.site.register(AttendanceReportProxy)
 admin.site.register(LeaveReportStudentProxy)

@@ -2,6 +2,8 @@ from django.urls import path
 from main_app.EditResultView import EditResultView
 from . import hod_views, staff_views, student_views, views
 
+
+
 urlpatterns = [
     # General / Authentication Views
     path("", views.login_page, name='login_page'),
@@ -45,6 +47,14 @@ urlpatterns = [
     path("course/edit/<int:course_id>", hod_views.edit_course, name='edit_course'),
     path("subject/edit/<int:subject_id>", hod_views.edit_subject, name='edit_subject'),
 
+    # path('api/hod/notifications/', hod_views.api_fetch_hod_notifications, name='api_fetch_hod_notifications'),
+    path('hod/staff-leave/', hod_views.view_staff_leave, name='view_staff_leave'),
+    path('hod/student-leave/', hod_views.view_student_leave, name='view_student_leave'),
+    path('hod/student-feedback/', hod_views.student_feedback_message, name='student_feedback_message'),
+    path('hod/staff-feedback/', hod_views.staff_feedback_message, name='staff_feedback_message'),
+
+
+
     # Staff Views
     path("staff/home/", staff_views.staff_home, name='staff_home'),
     path("staff/apply/leave/", staff_views.staff_apply_leave, name='staff_apply_leave'),
@@ -71,6 +81,56 @@ urlpatterns = [
     path("staff/result/delete/<int:student_id>/", staff_views.staff_delete_result, name='delete_student_result'),
     # ... other URL patterns ...
     path("staff/result/pdf/<int:student_id>/", staff_views.staff_result_pdf, name='staff_result_pdf'),
+    path('staff/result/edit/<int:student_id>/', staff_views.EditResultView.as_view(), name='edit_student_result'),
+    path('staff/result/compiled/<int:student_id>/<int:session_id>/', staff_views.compile_session_results, name='staff_view_session_results'),
+    # path('staff/result/term/', staff_views.staff_view_term_results, name='staff_view_term_results'),
+     path('get_terms/', staff_views.get_terms, name='get_terms'),
+     path('get_terms/', staff_views.get_terms, name='get_terms'),
+     path('get_terms/', staff_views.get_terms, name='get_terms'),
+     path('result/filtered/', staff_views.staff_view_result_filtered, name='staff_view_result_filtered'),
+    # path('api/notifications/', staff_views.api_fetch_notifications, name='api_fetch_notifications'),
+    # path('staff/notifications/ajax/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
+    # path('ajax/get-notifications/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
+    # path('ajax/notifications/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
+    # path('ajax/notifications/mark-read/', staff_views.ajax_mark_notifications_read, name='ajax_mark_notifications_read'),
+    # path('ajax/notifications/', student_views.ajax_get_notifications, name='ajax_get_notifications'),
+    # path('ajax/notifications/mark-read/', student_views.ajax_mark_notifications_read, name='ajax_mark_notifications_read'),
+    # path('ajax/notifications/', hod_views.ajax_get_notifications, name='ajax_get_notifications'),
+    # path('ajax/notifications/mark-read/', hod_views.ajax_mark_notifications_read, name='ajax_mark_notifications_read'),
+
+   
+    # AJAX notifications for students:///////////////////////////////////////////////////////////////
+    # path('ajax/notifications/student/', student_views.ajax_get_notifications_student, name='ajax_get_notifications_student'),
+    # path('ajax/notifications/student/mark-read/', student_views.ajax_mark_notifications_read_student, name='ajax_mark_notifications_read_student'),
+
+    # For HOD (currently returns empty list – modify later if you add a NotificationHOD model):
+    # path('ajax/notifications/hod/', hod_views.ajax_get_notifications_hod, name='ajax_get_notifications_hod'),
+    # path('ajax/notifications/hod/mark-read/', hod_views.ajax_mark_notifications_read_hod, name='ajax_mark_notifications_read_hod'),
+    # path('hod/notifications/', hod_views.hod_view_notification, name='hod_view_notification'),
+    # path('ajax/get-notifications/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
+    path('ajax/notifications/hod/', hod_views.ajax_get_notifications_hod, name='ajax_get_notifications_hod'),
+    path('ajax/notifications/hod/mark-read/', hod_views.ajax_mark_notifications_read_hod, name='ajax_mark_notifications_read_hod'),
+    path('api/notifications/hod/', hod_views.api_fetch_hod_notifications, name='api_fetch_hod_notifications'),
+    path('hod/view/notification/', hod_views.hod_view_notification, name='hod_view_notification'),
+    path('ajax/notifications/hod/', hod_views.ajax_get_notifications_hod, name='ajax_get_notifications_hod'),
+
+     # HOD (Admin) Notifications
+    # path('ajax/get-notifications-hod/', hod_views.ajax_get_notifications_hod, name='ajax_get_notifications_hod'),
+    # path('ajax/mark-notifications-read-hod/', hod_views.ajax_mark_notifications_read_hod, name='ajax_mark_notifications_read_hod'),
+
+    # Staff Notifications
+    path('ajax/get-notifications-staff/', staff_views.ajax_get_notifications_staff, name='ajax_staff_notifications'),
+    path('ajax/mark-notifications-read-staff/', staff_views.ajax_mark_notifications_read_staff, name='ajax_mark_notifications_read_staff'),
+
+    # Student Notifications
+    path('ajax/get-notifications-student/', student_views.ajax_get_notifications_student, name='ajax_get_notifications_student'),
+    path('ajax/mark-notifications-read-student/', student_views.ajax_mark_notifications_read_student, name='ajax_mark_notifications_read_student'),
+
+
+
+     
+     
+
 
 
     # Student Views
@@ -87,5 +147,18 @@ urlpatterns = [
     path("student/view/result/<int:student_id>/", student_views.student_view_result, name="student_view_result"),
      # ... other URL patterns ...
     path("student/result/pdf/", student_views.student_result_pdf, name="student_result_pdf"),
+    path('result/filtered/', student_views.student_result_detail_filtered, name='student_result_detail_filtered'),
+    path('results/', student_views.student_results_list, name='student_results_list'),
+    path('get_terms/', student_views.get_terms, name='get_terms'),
+    path('get_terms/', student_views.get_terms, name='get_terms'),
+    # ... your other URL patterns ...
+    path('student/result/filtered/', student_views.student_result_detail_filtered, name='student_result_detail_filtered'),
+    # ... your other url patterns ...
+      # ... other URL patterns for student ...
+    path('ajax/student/notifications/', student_views.ajax_student_notifications, name='ajax_student_notifications'),
+    path('ajax/staff/notifications/', staff_views.ajax_staff_notifications3, name='ajax_staff_notifications3'),
+    
+
+
 
 ]

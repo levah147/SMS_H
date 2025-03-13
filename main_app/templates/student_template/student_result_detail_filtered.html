@@ -1,0 +1,357 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'base.css' %}">
+<div class="report-card">
+  <!-- Header Section -->
+  <div class="header">
+    <div class="header-content">
+      <div class="logo">
+        <img src="{% static 'dist/img/2.png' %}" alt="School Logo" style="max-height: 60px;">
+      </div>
+      <div class="school-info">
+        <h1 style="color: #28a745;  font-weight: 700;">HIBISCUS ROYAL ACADEMY </h1>
+        <p>Academic Session: {{ session.start_year }} - {{ session.end_year }}</p>
+        <p>Term: {{ term.name }} Term</p>
+        <p>Website: www.hibiscusroyal2.vercel.app/</p>
+        <p>Tel: +234XXXXXXXXX - Email: info@hibiscusroyalacademy.com</p>
+      </div>
+      <div class="passport">
+        {% if student.admin.profile_pic %}
+        <img src="{{ request.user.profile_pic}}" class="img-circle elevation-2" alt="User Image">
+
+        {% else %}
+          <img src="{% static 'dist/img/default_student.png' %}" alt="Default Student Image" style="max-height: 80px;">
+        {% endif %}
+      </div>
+    </div>
+    <h2 class="report-title">End of Term Report Sheet</h2>
+    <h3 class="academic-year">{{ term.name }} Term - Academic Session: {{ session.start_year }} - {{ session.end_year }}</h3>
+  </div>
+
+  <!-- Student Information -->
+  <table class="student-info">
+    <tr>
+      <td class="label">Student Name</td>
+      <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
+      <td class="label">Gender</td>
+      <td>{{ student.admin.gender }}</td>
+      
+    </tr>
+    <tr>
+      <td class="label">Admission Number</td>
+      <td>{{ student.admin.email }}</td>
+      <td class="label">Class Group</td>
+      <td>{{ student.program.name }}</td>
+      
+    </tr>
+    <tr>
+      <td class="label">Resumption Date</td>
+                <td>Monday, 13th January 2025</td>
+      <td class="label">Term</td>
+      <td>{{ term.name }} Term</td>
+    </tr>
+    <tr>
+      <td class="label">No of days in Term</td>
+                <td>130</td>
+                <td class="label">No in Class</td>
+                <td>33</td>
+    </tr>
+    <!-- You can add more rows here if you have additional data (e.g. Resumption Date, No in Class, etc.) -->
+  </table>
+
+  <!-- Academic Performance Table -->
+  <table class="academic-table">
+    <thead class="thead-light">
+      <tr>
+        <th>S/N</th>
+        <th>Subject</th>
+        <th>CAT 1 (0–30)</th>
+        <th>CAT 2 (0–10)</th>
+        <th>Exam (0–60)</th>
+        <th>Total (100)</th>
+        <th>Grade</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for result in results %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ result.subject.name }}</td>
+        <td>{{ result.ca_test1 }}</td>
+        <td>{{ result.ca_test2 }}</td>
+        <td>{{ result.exam_score }}</td>
+        <td>{{ result.total_score }}</td>
+        <td>{{ result.grade }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Result Summary Section -->
+  <div class="total-score">
+    <div><strong>Grand Total Score:</strong> {{ summary.total_score }}</div>
+    <div><strong>Final Average:</strong> {{ summary.average_score|floatformat:"2" }}</div>
+    <div><strong>Final Grade:</strong> {{ summary.grade }}</div>
+  </div>
+
+    <!-- Progress Report Grid -->
+    <div class="progress-container">
+      <div class="progress-section">
+          <h4>PROGRESS REPORT (USE RATING)</h4>
+          <table class="progress-table">
+              <tr>
+                  <td class="trait">PUNCTUATION</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td class="checked">3</td>
+                  <td>4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">ATTITUDE TO STUDIES</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">DETERMINATION</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">FLUENCY</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">HANDWRITING IMITATION</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">MUSICAL SKILLS</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">PEER RELATIONSHIP</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+          </table>
+      </div>
+      <div class="progress-section">
+          <h4>PROGRESS REPORT (USE RATING)</h4>
+          <table class="progress-table">
+              <tr>
+                  <td class="trait">CARRYING OUT ASSIGNMENTS</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">DRAWING AND PAINTING</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">GAMES AND SPORT</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">HONESTY</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">LEADERSHIP</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+              <tr>
+                  <td class="trait">NEATNESS</td>
+                  <td>1</td>
+                  <td>2</td>
+                  <td>3</td>
+                  <td class="checked">4</td>
+                  <td>5</td>
+              </tr>
+          </table>
+      </div>
+  </div>
+  <!-- Teacher's Remarks -->
+  <!-- <div class="remarks-section">
+    <h4>Teacher's Remarks</h4>
+    <p>{{ summary.teacher_remarks }}</p>
+  </div> -->
+
+    <!-- Comments Section -->
+    <div class="comments-section">
+      <div class="comment-label">OVERALL PSYCHOMOTOR/BEHAVIOURAL DEVELOPMENT</div>
+      <div class="comment-box"> {{ summary.teacher_remarks }}
+          Audrey is an epitome of excellence, her most commendable qualities are quietness, neateness and a good critical
+          thinking ability. Even though she hasn't achieved the desired level of confidence, the activities she engages in sets her on
+          the path achieve it sooner than later. Please always inspire her to continue on this level of excellence.
+      </div>
+  </div>
+
+
+         <!-- School Administrator's Comment -->
+         <div class="admin-comment">
+          <div class="comment-label">School Administrator's Comment</div>
+          <div class="comment-box">Exceptional performance, keep it up</div>
+      </div>
+
+      <!-- Grading System -->
+      <div class="grading-system">
+          <h4>Grading System</h4>
+          <div class="grading-content">
+              <div class="grading-column">
+                  <p>0.0 - 49.9 : E EMERGING</p>
+                  <p>50.0 - 59.9 : D AVERAGE</p>
+                  <p>60.0 - 69.9 : C GOOD</p>
+                  <p>70.0 - 79.9 : B VERY GOOD</p>
+                  <p>80.0 - 100.0 : A EXCELLENT</p>
+              </div>
+              <div class="grading-column">
+                  <p>Behavioural/Attitudes Grade:</p>
+                  <p>EXCELLENT - 5, VERY GOOD - 4, GOOD - 3, FAIR - 2, WEAK - 1</p>
+              </div>
+          </div>
+      </div>
+
+      <div class="footer">
+          This is a computer generated report sheet and is deemed authentic if devoid of alterations.
+      </div>
+  </div>
+
+  <script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add data-label attributes to table cells for mobile view
+      function prepareTablesForMobile() {
+          const academicTable = document.querySelector('.academic-table');
+          if (!academicTable) return;
+          
+          const headers = academicTable.querySelectorAll('thead th');
+          const headerTexts = Array.from(headers).map(header => header.textContent);
+          
+          const rows = academicTable.querySelectorAll('tbody tr');
+          rows.forEach(row => {
+              const cells = row.querySelectorAll('td');
+              cells.forEach((cell, index) => {
+                  if (headerTexts[index]) {
+                      cell.setAttribute('data-label', headerTexts[index]);
+                  }
+              });
+          });
+      }
+      
+      // Add print button functionality
+      const addPrintButton = () => {
+          const printBtn = document.createElement('button');
+          printBtn.innerText = 'Print Report Card';
+          printBtn.className = 'print-button';
+          
+          printBtn.addEventListener('click', () => {
+              window.print();
+          });
+          
+          document.querySelector('.report-card').appendChild(printBtn);
+      };
+      
+      // Initialize mobile optimizations
+      prepareTablesForMobile();
+      addPrintButton();
+      
+      // Check if device is mobile and apply additional optimizations if needed
+      const isMobile = window.matchMedia("(max-width: 600px)").matches;
+      if (isMobile) {
+          // Any additional mobile-specific JavaScript can go here
+          
+          // For example, add a button to toggle full table view
+          const addToggleButton = () => {
+              const toggleBtn = document.createElement('button');
+              toggleBtn.innerText = 'Toggle Full Table View';
+              toggleBtn.className = 'toggle-button print-button';
+              toggleBtn.style.marginTop = '10px';
+              toggleBtn.style.backgroundColor = '#2196F3';
+              
+              toggleBtn.addEventListener('click', () => {
+                  document.querySelector('.academic-table').classList.toggle('full-view');
+                  if (document.querySelector('.academic-table').classList.contains('full-view')) {
+                      document.querySelector('.academic-table thead').style.display = 'table-header-group';
+                      document.querySelectorAll('.academic-table tr').forEach(row => {
+                          row.style.display = 'table-row';
+                      });
+                      document.querySelectorAll('.academic-table td').forEach(cell => {
+                          cell.style.display = 'table-cell';
+                          cell.style.textAlign = 'center';
+                      });
+                  } else {
+                      prepareTablesForMobile();
+                      document.querySelector('.academic-table thead').style.display = 'none';
+                      document.querySelectorAll('.academic-table tr').forEach(row => {
+                          row.style.display = 'block';
+                      });
+                      document.querySelectorAll('.academic-table td').forEach(cell => {
+                          cell.style.display = 'flex';
+                          cell.style.textAlign = 'right';
+                      });
+                  }
+              });
+              
+              document.querySelector('.academic-table').parentNode.insertBefore(toggleBtn, document.querySelector('.academic-table'));
+          };
+          
+          // Uncomment to add toggle button
+          // addToggleButton();
+      }
+  });
+
+  </script>
+
+  <!-- Print PDF Button -->
+  <div class="no-print" style="text-align: center; margin-top: 20px;">
+    <a href="{% url 'student_result_pdf' %}?session={{ session.id }}&term={{ term.id }}" target="_blank" class="btn btn-primary">Print PDF</a>
+  </div>
+</div>
+
+{% endblock content %}

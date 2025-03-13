@@ -24,46 +24,63 @@ class CustomUserManager(UserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        assert extra_fields["is_staff"]
-        assert extra_fields["is_superuser"]
+        assert extra_fields["is_staff"], "Superuser must have is_staff=True."
+        assert extra_fields["is_superuser"], "Superuser must have is_superuser=True."
         return self._create_user(email, password, **extra_fields)
 
 
 class Session(models.Model):
+    """
+    Represents an academic session.
+    """
     start_year = models.DateField()
     end_year = models.DateField()
 
     def __str__(self):
-        return "From " + str(self.start_year) + " to " + str(self.end_year)
+        return f"From {self.start_year} to {self.end_year}"
 
 
 class CustomUser(AbstractUser):
-    USER_TYPE = ((1, "HOD"), (2, "Staff"), (3, "Student"))
+    """
+    Custom user model that uses email as the unique identifier and supports different user types.
+    """
+    # Using string keys for choices
+    USER_TYPE = (("1", "HOD"), ("2", "Staff"), ("3", "Student"))
     GENDER = [("M", "Male"), ("F", "Female")]
     
-    # Remove username; we'll use email as the unique identifier.
+    # Remove username; use email as the unique identifier.
     username = None  
     email = models.EmailField(unique=True)
-    user_type = models.CharField(default=1, choices=USER_TYPE, max_length=1)
+    user_type = models.CharField(default="1", choices=USER_TYPE, max_length=1)
     gender = models.CharField(max_length=1, choices=GENDER)
-    profile_pic = models.ImageField()
+    profile_pic = models.ImageField(blank=True)  # Allow blank if no image provided.
     address = models.TextField()
-    fcm_token = models.TextField(default="")  # For firebase notifications
+    fcm_token = models.TextField(default="")  # For Firebase notifications.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.last_name + ", " + self.first_name
+        return f"{self.last_name}, {self.first_name}"
 
 
 class Admin(models.Model):
+    """
+    Administrator profile linked to CustomUser.
+    """
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return str(self.admin)
 
 
 class Program(models.Model):
+    """
+    Academic program (e.g., a course of study).
+    """
     name = models.CharField(max_length=120)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -73,23 +90,32 @@ class Program(models.Model):
 
 
 class Student(models.Model):
+    """
+    Student profile linked to a CustomUser.
+    """
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING)
     session = models.ForeignKey(Session, on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
-        return self.admin.last_name + ", " + self.admin.first_name
+        return f"{self.admin.last_name}, {self.admin.first_name}"
 
 
 class Staff(models.Model):
-    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=False)
+    """
+    Staff profile linked to a CustomUser.
+    """
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING)
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.admin.last_name + " " + self.admin.first_name
+        return f"{self.admin.last_name} {self.admin.first_name}"
 
 
 class Subject(models.Model):
+    """
+    Subject offered in a Program.
+    """
     name = models.CharField(max_length=120)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     program = models.ForeignKey(Program, on_delete=models.CASCADE)
@@ -101,6 +127,9 @@ class Subject(models.Model):
 
 
 class Attendance(models.Model):
+    """
+    Represents a specific attendance record for a subject on a given date.
+    """
     session = models.ForeignKey(Session, on_delete=models.DO_NOTHING)
     subject = models.ForeignKey(Subject, on_delete=models.DO_NOTHING)
     date = models.DateField()
@@ -109,6 +138,9 @@ class Attendance(models.Model):
 
 
 class AttendanceReport(models.Model):
+    """
+    Individual student's attendance status for a specific attendance record.
+    """
     student = models.ForeignKey(Student, on_delete=models.DO_NOTHING)
     attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE)
     status = models.BooleanField(default=False)
@@ -117,6 +149,9 @@ class AttendanceReport(models.Model):
 
 
 class LeaveReportStudent(models.Model):
+    """
+    Student leave report.
+    """
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     date = models.CharField(max_length=60)
     message = models.TextField()
@@ -126,6 +161,9 @@ class LeaveReportStudent(models.Model):
 
 
 class LeaveReportStaff(models.Model):
+    """
+    Staff leave report.
+    """
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     date = models.CharField(max_length=60)
     message = models.TextField()
@@ -135,6 +173,9 @@ class LeaveReportStaff(models.Model):
 
 
 class FeedbackStudent(models.Model):
+    """
+    Student feedback.
+    """
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     feedback = models.TextField()
     reply = models.TextField()
@@ -143,6 +184,9 @@ class FeedbackStudent(models.Model):
 
 
 class FeedbackStaff(models.Model):
+    """
+    Staff feedback.
+    """
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     feedback = models.TextField()
     reply = models.TextField()
@@ -151,25 +195,55 @@ class FeedbackStaff(models.Model):
 
 
 class NotificationStaff(models.Model):
+    """
+    Notifications for staff.
+    """
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     message = models.TextField()
+    is_read = models.BooleanField(default=False)  # Add this field  # New field to track if notification is read.
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    def __str__(self):
+        return f"Notification for {self.staff}"
+    
+    
 
 class NotificationStudent(models.Model):
+    """
+    Notifications for students.
+    """
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)  # New field to track if notification is read.
+    
     updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return f"Notification for {self.student}"
 
+# ---------- Term and Result Models ----------
 
-# ---------- Updated Result Module ----------
+class Term(models.Model):
+    """
+    Represents a term within an academic session.
+    Each Session is divided into three terms: 1st Term, 2nd Term, and 3rd Term.
+    """
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='terms')
+    name = models.CharField(max_length=10, choices=[('1st', '1st Term'), ('2nd', '2nd Term'), ('3rd', '3rd Term')])
 
-# Replace the previous StudentResult with an updated Result model
+    def __str__(self):
+        return f"{self.name} Term, {self.session}"
+    
+    
 class Result(models.Model):
+    """
+    Stores results for a student in a subject for a particular term.
+    """
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    # Allow term to be nullable temporarily for migration; later you may enforce non-null.
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, null=True, blank=True)
     ca_test1 = models.DecimalField(
         max_digits=5, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(30)]
@@ -187,10 +261,9 @@ class Result(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ['student', 'subject']
+        unique_together = ['student', 'subject', 'term']
     
     def calculate_total(self):
-        # Total Score = CA Test 1 + CA Test 2 + Exam Score
         return self.ca_test1 + self.ca_test2 + self.exam_score
     
     def save(self, *args, **kwargs):
@@ -218,6 +291,9 @@ class Result(models.Model):
 
 
 class ResultSummary(models.Model):
+    """
+    Aggregated result summary for a student.
+    """
     student = models.OneToOneField(Student, on_delete=models.CASCADE)
     total_score = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     average_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
@@ -246,24 +322,61 @@ class ResultSummary(models.Model):
                 f"Pos {self.position}, Grade {self.grade}")
 
 
+class SessionResultSummary(models.Model):
+    """
+    Compiled session result summary that aggregates results from all terms of a session.
+    """
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
+    total_score = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    average_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    grade = models.CharField(max_length=2, default='F')
+    teacher_remarks = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"Session Result for {self.student.admin.last_name}, {self.student.admin.first_name} in {self.session}"
+
+
 # ---------- Signals for Profile Creation ----------
 
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        if instance.user_type == 1:
+        if instance.user_type == "1":
             Admin.objects.create(admin=instance)
-        if instance.user_type == 2:
+        elif instance.user_type == "2":
             Staff.objects.create(admin=instance)
-        if instance.user_type == 3:
+        elif instance.user_type == "3":
             Student.objects.create(admin=instance)
 
 
 @receiver(post_save, sender=CustomUser)
 def save_user_profile(sender, instance, **kwargs):
-    if instance.user_type == 1:
+    if instance.user_type == "1" and hasattr(instance, 'admin'):
         instance.admin.save()
-    if instance.user_type == 2:
+    elif instance.user_type == "2" and hasattr(instance, 'staff'):
         instance.staff.save()
-    if instance.user_type == 3:
+    elif instance.user_type == "3" and hasattr(instance, 'student'):
         instance.student.save()
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Session)
+def create_terms_for_session(sender, instance, created, **kwargs):
+    if created:
+        # Create three terms automatically for the new session.
+        term_choices = ['1st', '2nd', '3rd']
+        for term_name in term_choices:
+            Term.objects.create(session=instance, name=term_name)
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Session)
+def create_default_terms(sender, instance, created, **kwargs):
+    if created:
+        Term.objects.create(session=instance, name="1st")
+        Term.objects.create(session=instance, name="2nd")
+        Term.objects.create(session=instance, name="3rd")

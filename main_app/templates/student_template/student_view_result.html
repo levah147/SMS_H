@@ -19,6 +19,9 @@
       {% endif %}
       </div>
       <div class="no-print">
+        <div class="col-md-3 text-right no-print">
+          <button class="btn btn-outline-primary" onclick="window.print()">Print Result</button>
+        </div>
         
         <a href="{% url 'student_result_pdf' %}" target="_blank" class="btn btn-primary">Print PDF</a>
       </div>

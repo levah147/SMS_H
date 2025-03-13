@@ -1,3 +1,40 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 {% extends 'main_app/base.html' %}
 {% load static %}
 
@@ -29,7 +66,6 @@
               {% endfor %}
             </select>
           </div>
-
           <!-- Academic Session Dropdown -->
           <div class="form-group mb-3">
             <label for="session">Select Academic Session</label>
@@ -40,7 +76,6 @@
               {% endfor %}
             </select>
           </div>
-
           <!-- Term Dropdown (initially empty) -->
           <div class="form-group mb-3">
             <label for="term">Select Term</label>
@@ -48,26 +83,16 @@
               <option value="">-- Select Term --</option>
             </select>
           </div>
-
-          <!-- NEW: Additional Information -->
-          <div class="card p-3 mb-3 bg-light">
-            <h5 class="mb-3">Additional Student Info</h5>
-            <p><strong>Resumption Date:</strong> <span id="resumptionDate">N/A</span></p>
-            <p><strong>No of Days in Term:</strong> <span id="daysInTerm">N/A</span></p>
-            <p><strong>Attendance:</strong> <span id="attendance">N/A</span></p>
-            <p><strong>No in Class:</strong> <span id="noInClass">N/A</span></p>
-          </div>
-
           <!-- Subject Results Table -->
           <div class="table-responsive">
             <table class="table table-bordered">
               <thead class="thead-light">
                 <tr>
                   <th>Subject</th>
-                  <th>CAT1 (30 Marks)</th>
-                  <th>CAT2 (10 Marks)</th>
-                  <th>EXAM (60 Marks)</th>
-                  <th>TOTAL</th>
+                  <th>CAT1 (30Marks)</th>
+                  <th>CAT1 (10Marks)</th>
+                  <th>EXAM (60Marks)</th>
+                  <th>TOTAL </th>
                 </tr>
               </thead>
               <tbody>
@@ -94,13 +119,11 @@
               </tbody>
             </table>
           </div>
-
           <!-- Teacher's Remarks -->
           <div class="remarks-section mt-4">
             <h4>Teacher's Remarks</h4>
             <textarea name="teacher_remarks" class="form-control" rows="4" placeholder="Enter remarks about the student's performance..." required></textarea>
           </div>
-
           <!-- Save Button -->
           <div class="text-center mt-4">
             <button type="submit" class="btn btn-primary">Save Results</button>
@@ -115,66 +138,74 @@
 {% block custom_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const sessionDropdown = document.getElementById('session');
-    const termDropdown = document.getElementById('term');
-    const studentDropdown = document.getElementById('student');
-
-    // Function to fetch terms when session is selected
-    sessionDropdown.addEventListener('change', function() {
-        const sessionId = this.value;
+    // When the session dropdown changes, fetch the terms for that session.
+    document.getElementById('session').addEventListener('change', function() {
+        var sessionId = this.value;
+        var termDropdown = document.getElementById('term');
+        // Clear any current options.
         termDropdown.innerHTML = '<option value="">-- Select Term --</option>';
+        
         if (sessionId) {
+            // Send an AJAX POST to get the terms.
             fetch("{% url 'get_terms' %}", {
-                method: 'POST',
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/x-www-form-urlencoded" },
-                body: "session=" + sessionId
-            })
+              method: 'POST',
+              headers: {
+                  "X-CSRFToken": "{{ csrf_token }}",
+                  "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: "session=" + sessionId
+          })
+          
             .then(response => response.json())
             .then(data => {
-                data.forEach(term => {
-                    const option = document.createElement("option");
-                    option.value = term.id;
-                    option.text = term.name + " Term";
-                    termDropdown.appendChild(option);
-                });
+                if (data.error) {
+                    console.error(data.error);
+                } else {
+                    // For each returned term, create an option.
+                    data.forEach(function(term) {
+                        var option = document.createElement("option");
+                        option.value = term.id;
+                        option.text = term.name + " Term";
+                        termDropdown.appendChild(option);
+                    });
+                }
             })
-            .catch(error => console.error('Error fetching terms:', error));
+            .catch(error => console.error('Error:', error));
         }
     });
 
-    // Function to fetch additional student details
-    studentDropdown.addEventListener('change', function() {
-        const studentId = this.value;
-        const sessionId = sessionDropdown.value;
-        const termId = termDropdown.value;
-
-        if (studentId && sessionId && termId) {
-            fetch("", {
-                method: 'POST',
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/x-www-form-urlencoded" },
-                body: `student=${studentId}&session=${sessionId}&term=${termId}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('resumptionDate').textContent = data.resumption_date || 'N/A';
-                document.getElementById('daysInTerm').textContent = data.days_in_term || 'N/A';
-                document.getElementById('attendance').textContent = data.attendance || 'N/A';
-                document.getElementById('noInClass').textContent = data.no_in_class || 'N/A';
-            })
-            .catch(error => console.error('Error fetching student details:', error));
-        }
-    });
-
-    // Auto-calculate total scores
-    document.querySelectorAll('.subject-row').forEach(row => {
-        row.querySelectorAll('input[type="number"]').forEach(input => {
-            input.addEventListener('input', () => {
-                const ca1 = parseFloat(row.querySelector('.ca1').value) || 0;
-                const ca2 = parseFloat(row.querySelector('.ca2').value) || 0;
-                const exam = parseFloat(row.querySelector('.exam').value) || 0;
-                row.querySelector('.total').value = (ca1 + ca2 + exam).toFixed(2);
-            });
+    // Attach input event listeners on each subject row.
+    const rows = document.querySelectorAll('.subject-row');
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input[type="number"]:not([readonly])');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => calculateTotal(row));
         });
+    });
+    
+    function calculateTotal(row) {
+        const ca1 = parseFloat(row.querySelector('.ca1').value) || 0;
+        const ca2 = parseFloat(row.querySelector('.ca2').value) || 0;
+        const exam = parseFloat(row.querySelector('.exam').value) || 0;
+        if (ca1 > 30) row.querySelector('.ca1').value = 30;
+        if (ca2 > 10) row.querySelector('.ca2').value = 10;
+        if (exam > 60) row.querySelector('.exam').value = 60;
+        const total = ca1 + ca2 + exam;
+        row.querySelector('.total').value = total.toFixed(2);
+    }
+     
+    // Optional: Validate form before submission.
+    document.getElementById('resultForm').addEventListener('submit', function(e) {
+        let isValid = true;
+        const rows = document.querySelectorAll('.subject-row');
+        rows.forEach(row => {
+            const total = parseFloat(row.querySelector('.total').value) || 0;
+            if (total > 100) {
+                isValid = false;
+                alert('Total score cannot exceed 100 for any subject.');
+            }
+        });
+        if (!isValid) e.preventDefault();
     });
 });
 </script>

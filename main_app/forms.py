@@ -172,3 +172,21 @@ class EditResultForm(FormSettings):
         model = Result
         # Updated field names: using 'ca_test1', 'ca_test2', and 'exam_score'
         fields = ['student', 'subject', 'ca_test1', 'ca_test2', 'exam_score']
+
+
+
+class TermResultForm(forms.ModelForm):
+    # Include a term field; if you want a dropdown of terms.
+    term = forms.ModelChoiceField(queryset=Term.objects.all(), required=True, label="Term")
+    
+    class Meta:
+        model = Result
+        fields = ['student', 'subject', 'term', 'ca_test1', 'ca_test2', 'exam_score']
+
+
+class TermResultForm(FormSettings):
+    term = forms.ModelChoiceField(queryset=Term.objects.all(), required=True, label="Term")
+    
+    class Meta:
+        model = Result
+        fields = ['student', 'subject', 'term', 'ca_test1', 'ca_test2', 'exam_score']

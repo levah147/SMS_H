@@ -1,6 +1,67 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
 
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Student Details</h5>
+            <p><strong>Name:</strong> {{ student.admin.last_name }} {{ student.admin.first_name }}</p>
+            <p><strong>Session:</strong> {{ session.start_year }} - {{ session.end_year }}</p>
+            <p><strong>Term:</strong> {{ term.name }} Term</p>
+            <p><strong>Program:</strong> {{ student.program.name }}</p>
+            <p><strong>Resumption Date:</strong> {{ resumption_date }}</p>
+            <p><strong>No of Days in Term:</strong> {{ total_days_in_term }}</p>
+            <p><strong>Attendance:</strong> {{ total_attendance }} days present</p>
+            <p><strong>No in Class:</strong> {{ total_students_in_class }}</p>
+            <p><strong>Position:</strong> {{ position }}</p>
+            <p><strong>Teacher's Remarks:</strong> {{ summary.teacher_remarks }}</p>
+        </div>
+    </div>
+
+    <h4 class="mt-4">Results Breakdown</h4>
+    {% if results %}
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Subject</th>
+                        <th>CA Test 1</th>
+                        <th>CA Test 2</th>
+                        <th>Exam Score</th>
+                        <th>Total Score</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td>{{ result.subject.name }}</td>
+                        <td>{{ result.ca_test1 }}</td>
+                        <td>{{ result.ca_test2 }}</td>
+                        <td>{{ result.exam_score }}</td>
+                        <td>{{ result.total_score }}</td>
+                        <td>{{ result.grade }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>No results found for this student.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+
+
+
+{% comment %} {% extends 'main_app/base.html' %}
+{% load static %}
+
 {% block page_title %}{{ page_title }}{% endblock page_title %}
 
 {% block content %}
@@ -41,7 +102,13 @@
       <td class="label">Student Name</td>
       <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
       <td class="label">Gender</td>
-      <td>{{ student.admin.gender }}</td>
+      {% if student.admin.gender == "F" %}
+  <td>Female</td>
+{% elif student.admin.gender == "M" %}
+  <td>Male</td>
+{% endif %}
+
+      {% comment %} <td>{{ student.admin.gender }}</td> 
     </tr>
     <tr>
       <td class="label">Admission Number</td>
@@ -99,8 +166,8 @@
     <div><strong>Grand Total Score:</strong> {{ summary.total_score }}</div>
     <div><strong>Final Average:</strong> {{ summary.average_score|floatformat:"2" }}</div>
     <div><strong>Position:</strong> {{ summary.position }}</div>
-    <div><strong>Final Grade:</strong> {{ summary.grade }}</div> 
-  </div>
+    <div><strong>Final Grade:</strong> {{ summary.grade }}</div>
+  </div> 
   <div class="remarks-section">
     <h4>Teacher's Remarks</h4>
     <p>{{ summary.teacher_remarks }}</p>
@@ -114,4 +181,4 @@
     <a href="{% url 'staff_result_pdf' student.id %}" target="_blank" class="btn btn-primary">Print PDF</a>
   </div>
 </div>
-{% endblock content %}
+{% endblock content %} {% endcomment %}

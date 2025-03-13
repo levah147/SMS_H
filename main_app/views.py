@@ -9,8 +9,9 @@ from django.views.decorators.csrf import csrf_exempt
 from .EmailBackend import EmailBackend
 from .models import Attendance, Session, Subject
 
-# Create your views here.
-
+# ------------------------------
+# User Authentication Views
+# ------------------------------
 
 def login_page(request):
     if request.user.is_authenticated:
@@ -27,28 +28,28 @@ def doLogin(request, **kwargs):
     if request.method != 'POST':
         return HttpResponse("<h4>Denied</h4>")
     else:
-        #Google recaptcha
+        # (Optional) Google reCAPTCHA code is commented out below.
         # captcha_token = request.POST.get('g-recaptcha-response')
         # captcha_url = "https://www.google.com/recaptcha/api/siteverify"
-        # captcha_key = "6LfswtgZAAAAABX9gbLqe-d97qE2g1JP8oUYritJ"
-        # data = {
-        #     'secret': captcha_key,
-        #     'response': captcha_token
-        # }
-        # # Make request
+        # captcha_key = "your-captcha-key"
+        # data = {'secret': captcha_key, 'response': captcha_token}
         # try:
         #     captcha_server = requests.post(url=captcha_url, data=data)
         #     response = json.loads(captcha_server.text)
-        #     if response['success'] == False:
+        #     if not response.get('success', False):
         #         messages.error(request, 'Invalid Captcha. Try Again')
         #         return redirect('/')
-        # except:
+        # except Exception:
         #     messages.error(request, 'Captcha could not be verified. Try Again')
         #     return redirect('/')
-        
-        #Authenticate
-        user = EmailBackend.authenticate(request, username=request.POST.get('email'), password=request.POST.get('password'))
-        if user != None:
+
+        # Authenticate using the custom EmailBackend.
+        user = EmailBackend.authenticate(
+            request,
+            username=request.POST.get('email'),
+            password=request.POST.get('password')
+        )
+        if user is not None:
             login(request, user)
             if user.user_type == '1':
                 return redirect(reverse("admin_home"))
@@ -61,12 +62,15 @@ def doLogin(request, **kwargs):
             return redirect("/")
 
 
-
 def logout_user(request):
-    if request.user != None:
+    if request.user:
         logout(request)
     return redirect("/")
 
+
+# ------------------------------
+# Attendance View
+# ------------------------------
 
 @csrf_exempt
 def get_attendance(request):
@@ -79,48 +83,50 @@ def get_attendance(request):
         attendance_list = []
         for attd in attendance:
             data = {
-                    "id": attd.id,
-                    "attendance_date": str(attd.date),
-                    "session": attd.session.id
-                    }
+                "id": attd.id,
+                "attendance_date": str(attd.date),
+                "session": attd.session.id
+            }
             attendance_list.append(data)
-        return JsonResponse(json.dumps(attendance_list), safe=False)
+        # Directly pass Python object to JsonResponse (no need for json.dumps)
+        return JsonResponse(attendance_list, safe=False)
     except Exception as e:
-        return None
+        # Return a JSON error message with status 400
+        return JsonResponse({'error': str(e)}, status=400)
 
+
+# ------------------------------
+# Firebase Service Worker JS
+# ------------------------------
 
 def showFirebaseJS(request):
     data = """
     // Give the service worker access to Firebase Messaging.
-// Note that you can only use Firebase Messaging here, other Firebase libraries
-// are not available in the service worker.
-importScripts('https://www.gstatic.com/firebasejs/7.22.1/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/7.22.1/firebase-messaging.js');
+    // Note: Only Firebase Messaging is available here.
+    importScripts('https://www.gstatic.com/firebasejs/7.22.1/firebase-app.js');
+    importScripts('https://www.gstatic.com/firebasejs/7.22.1/firebase-messaging.js');
 
-// Initialize the Firebase app in the service worker by passing in
-// your app's Firebase config object.
-// https://firebase.google.com/docs/web/setup#config-object
-firebase.initializeApp({
-    apiKey: "AIzaSyBarDWWHTfTMSrtc5Lj3Cdw5dEvjAkFwtM",
-    authDomain: "sms-with-django.firebaseapp.com",
-    databaseURL: "https://sms-with-django.firebaseio.com",
-    projectId: "sms-with-django",
-    storageBucket: "sms-with-django.appspot.com",
-    messagingSenderId: "945324593139",
-    appId: "1:945324593139:web:03fa99a8854bbd38420c86",
-    measurementId: "G-2F2RXTL9GT"
-});
+    // Initialize the Firebase app in the service worker with your Firebase config.
+    firebase.initializeApp({
+        apiKey: "AIzaSyBarDWWHTfTMSrtc5Lj3Cdw5dEvjAkFwtM",
+        authDomain: "sms-with-django.firebaseapp.com",
+        databaseURL: "https://sms-with-django.firebaseio.com",
+        projectId: "sms-with-django",
+        storageBucket: "sms-with-django.appspot.com",
+        messagingSenderId: "945324593139",
+        appId: "1:945324593139:web:03fa99a8854bbd38420c86",
+        measurementId: "G-2F2RXTL9GT"
+    });
 
-// Retrieve an instance of Firebase Messaging so that it can handle background
-// messages.
-const messaging = firebase.messaging();
-messaging.setBackgroundMessageHandler(function (payload) {
-    const notification = JSON.parse(payload);
-    const notificationOption = {
-        body: notification.body,
-        icon: notification.icon
-    }
-    return self.registration.showNotification(payload.notification.title, notificationOption);
-});
+    // Retrieve an instance of Firebase Messaging.
+    const messaging = firebase.messaging();
+    messaging.setBackgroundMessageHandler(function (payload) {
+        const notification = JSON.parse(payload);
+        const notificationOption = {
+            body: notification.body,
+            icon: notification.icon
+        };
+        return self.registration.showNotification(payload.notification.title, notificationOption);
+    });
     """
     return HttpResponse(data, content_type='application/javascript')

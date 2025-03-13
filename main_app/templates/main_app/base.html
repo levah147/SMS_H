@@ -47,6 +47,165 @@
                 </li>
 
             </ul>
+          
+            {% comment %} <ul class="navbar-nav ml-auto">
+              <!-- HOD Notifications Dropdown Menu -->
+              <li class="nav-item dropdown">
+                {% if request.user.user_type == '1' %}
+                {% url 'ajax_get_notifications_hod' as ajax_get_notifications_all_url %}
+
+                {% elif request.user.user_type == '2' %}
+                
+                {% url 'ajax_staff_notifications' as ajax_get_notifications_all_url %}
+                {% elif request.user.user_type == '3' %}
+
+                {% url 'ajax_get_notifications_student' as ajax_get_notifications_all_url %}
+                {% endif %}
+                <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
+                  <i class="fas fa-bell"></i>
+                  <span id="notificationBadge" class="badge badge-danger">0</span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right" id="notificationDropdown" style="left: inherit; right: 0px;">
+                  <span class="dropdown-item">Loading notifications...</span>
+                </div>
+              </li>
+            </ul>
+            <!-- Include jQuery if not already included -->
+            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+            <script>
+              function updateNotifications() {
+                $.ajax({
+                  url: "{{ ajax_get_notifications_all_url }}",
+                  method: "GET",
+                  dataType: "json",
+                  success: function(data) {
+                    // Update the badge with the number of unread notifications.
+                    $("#notificationBadge").text(data.length);
+                    
+                    // Clear the dropdown.
+                    var dropdown = $("#notificationDropdown");
+                    dropdown.empty();
+                    
+                    if (data.length > 0) {
+                      data.forEach(function(notification) {
+                        var li = $("<a></a>")
+                          .attr("href", "#")
+                          .addClass("dropdown-item")
+                          .text(notification.message);
+                        dropdown.append(li);
+                      });
+                    } else {
+                      dropdown.html('<span class="dropdown-item">No new notifications</span>');
+                    }
+                  },
+                  error: function(xhr, status, error) {
+                    console.error("Error fetching notifications:", error);
+                  }
+                });
+              }
+            
+              $(document).ready(function() {
+                // Update notifications immediately on page load.
+                updateNotifications();
+                // Refresh notifications every 60 seconds.
+                setInterval(updateNotifications, 6000);
+            
+                // When the dropdown is shown, mark notifications as read.
+                $(".nav-item.dropdown").on("show.bs.dropdown", function() {
+                  $.ajax({
+                    url: "{% url 'ajax_mark_notifications_read_hod' %}",
+                    method: "POST",
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                    success: function() {
+                      $("#notificationBadge").text("0");
+                    },
+                    error: function(xhr, status, error) {
+                      console.error("Error marking notifications as read:", error);
+                    }
+                  });
+                });
+              });
+            </script>  {% endcomment %}
+            
+       
+          <ul class="navbar-nav ml-auto">
+  <!-- Notifications Dropdown Menu -->
+  <li class="nav-item dropdown">
+    {% if request.user.user_type == '1' %}
+      {% url 'ajax_get_notifications_hod' as ajax_get_notifications_all_url %}
+      {% url 'ajax_mark_notifications_read_hod' as ajax_mark_notifications_read_all_url %}
+    {% elif request.user.user_type == '2' %}
+      {% url 'ajax_staff_notifications' as ajax_get_notifications_all_url %}
+      {% url 'ajax_mark_notifications_read_staff' as ajax_mark_notifications_read_all_url %}
+    {% elif request.user.user_type == '3' %}
+      {% url 'ajax_get_notifications_student' as ajax_get_notifications_all_url %}
+      {% url 'ajax_mark_notifications_read_student' as ajax_mark_notifications_read_all_url %}
+    {% endif %}
+
+    <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
+      <i class="fas fa-bell"></i>
+      <span id="notificationBadge" class="badge badge-danger">0</span>
+    </a>
+
+    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right" id="notificationDropdown" style="left: inherit; right: 0px;">
+      <span class="dropdown-item">Loading notifications...</span>
+    </div>
+  </li>
+</ul>
+
+<!-- jQuery (ensure it's included if not already) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  function updateNotifications() {
+    $.ajax({
+      url: "{{ ajax_get_notifications_all_url }}",
+      method: "GET",
+      dataType: "json",
+      success: function(data) {
+        // Update badge count
+        $("#notificationBadge").text(data.unread_count);
+
+        // Clear previous notifications
+        var dropdown = $("#notificationDropdown");
+        dropdown.empty();
+
+        if (data.notifications.length > 0) {
+          data.notifications.forEach(function(notification) {
+            var li = $("<a></a>")
+              .attr("href", "#")
+              .addClass("dropdown-item")
+              .html("<strong>" + notification.type + ":</strong> " + notification.message);
+            dropdown.append(li);
+          });
+        } else {
+          dropdown.html('<span class="dropdown-item">No new notifications</span>');
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error("Error fetching notifications:", error);
+      }
+    });
+  }
+
+  $(document).ready(function() {
+    updateNotifications();
+    setInterval(updateNotifications, 60000); // Update every 60 seconds
+    
+    // When dropdown opens, mark notifications as read dynamically
+    $(".nav-item.dropdown").on("show.bs.dropdown", function() {
+      $.ajax({
+        url: "{{ ajax_mark_notifications_read_all_url }}",
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+        success: function() {
+          $("#notificationBadge").text("0");
+        }
+      });
+    });
+  });
+</script>
+
+        
 
 
         </nav>

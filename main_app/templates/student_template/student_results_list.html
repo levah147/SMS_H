@@ -5,37 +5,49 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4">Results List</h2>
-    {% if students %}
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered">
-            <thead class="thead-light">
-                <tr>
-                    <th>Student Name</th>
-                    <th>Admission Number</th>
-                    <th>Program</th>
-                    <th>Session</th>
-                    <!-- Removed the Result Status column -->
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for student in students %}
-                <tr>
-                    <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
-                    <td>{{ student.admin.email }}</td>
-                    <td>{{ student.program.name }}</td>
-                    <td>{{ student.session }}</td>
-                    <td>
-                        <a href="{% url 'student_view_result' student.id %}" class="btn btn-sm btn-primary">View Result</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <h2 class="mb-4">Results List</h2>
+  <!-- Filtering Form -->
+  <form method="GET" class="mb-4" action="{% url 'student_result_detail_filtered' %}">
+    <div class="row">
+      <div class="col-md-6">
+        <label for="session">Select Academic Session</label>
+        <select name="session" id="session" class="form-control">
+          <option value="">-- All Sessions --</option>
+          {% for session in sessions %}
+            <option value="{{ session.id }}" {% if session.id|stringformat:"s" == selected_session_id %}selected{% endif %}>
+              {{ session.start_year }} - {{ session.end_year }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label for="term">Select Term</label>
+        <select name="term" id="term" class="form-control">
+          <option value="">-- All Terms --</option>
+          {# Only display terms that belong to the selected session if one is chosen #}
+          {% if selected_session_id %}
+            {% for term in terms %}
+              {% if term.session.id|stringformat:"s" == selected_session_id %}
+                <option value="{{ term.id }}" {% if term.id|stringformat:"s" == selected_term_id %}selected{% endif %}>
+                  {{ term.name }} Term
+                </option>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            {# Otherwise, list all terms #}
+            {% for term in terms %}
+              <option value="{{ term.id }}" {% if term.id|stringformat:"s" == selected_term_id %}selected{% endif %}>
+                {{ term.name }} Term ({{ term.session.start_year }}-{{ term.session.end_year }})
+              </option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </div>
     </div>
-    {% else %}
-        <p>No students found for your assigned program.</p>
-    {% endif %}
+    <button type="submit" class="btn btn-primary mt-3">Filter Results</button>
+  </form>
+
+ 
 </div>
 {% endblock content %}
+
