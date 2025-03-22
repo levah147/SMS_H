@@ -3,7 +3,7 @@
     "builds":[{
         "src": "student_management_system/wsgi.py",
         "use":"@vercel/python",
-        "config":{ "maxLambdaSize": "15mb", "runtime": "Python 3.10.6"}
+        "config":{ "maxLambdaSize": "15mb", "runtime": "python3.11"}
     },
     
     {"src": "build.sh",
