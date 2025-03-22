@@ -5,6 +5,9 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from decimal import Decimal
+from django.utils import timezone
+from django.utils.timezone import now  # Import this
+
 
 # ---------- Custom User and Related Models ----------
 
@@ -35,6 +38,7 @@ class Session(models.Model):
     """
     start_year = models.DateField()
     end_year = models.DateField()
+    # is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return f"From {self.start_year} to {self.end_year}"
@@ -53,7 +57,7 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     user_type = models.CharField(default="1", choices=USER_TYPE, max_length=1)
     gender = models.CharField(max_length=1, choices=GENDER)
-    profile_pic = models.ImageField(blank=True)  # Allow blank if no image provided.
+    profile_pic = models.ImageField(upload_to='profile_pics/', blank=True, null=True)  # Allow blank if no image provided.
     address = models.TextField()
     fcm_token = models.TextField(default="")  # For Firebase notifications.
     created_at = models.DateTimeField(auto_now_add=True)
@@ -94,7 +98,7 @@ class Student(models.Model):
     Student profile linked to a CustomUser.
     """
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING)
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True, blank=True)
     session = models.ForeignKey(Session, on_delete=models.DO_NOTHING, null=True)
 
     def __str__(self):
@@ -105,7 +109,7 @@ class Staff(models.Model):
     """
     Staff profile linked to a CustomUser.
     """
-    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING)
+    program = models.ForeignKey(Program, on_delete=models.DO_NOTHING, null=True)
     admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
 
     def __str__(self):
@@ -125,16 +129,56 @@ class Subject(models.Model):
     def __str__(self):
         return self.name
 
+class Term(models.Model):
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="terms")
+    name = models.CharField(max_length=10, choices=[('1st', '1st Term'), ('2nd', '2nd Term'), ('3rd', '3rd Term')])
+    beginning_of_term = models.DateField(null=True, blank=True)  # New Field
+    end_of_term = models.DateField(null=True, blank=True)  # New Field
+    days_in_term = models.PositiveIntegerField(default=0)
+    # resumption_date = models.DateField(null=True, blank=True)
+    resumption_date = models.DateField(null=True, blank=True)  # ✅ Add this line!
+
+    class Meta:
+        unique_together = ('session', 'name')  # Ensures no duplicate terms in the same session
+
+    def __str__(self):
+        return f"{self.name} ({self.session.start_year} - {self.session.end_year})"
+# class Attendance(models.Model):
+#     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+#     session = models.ForeignKey(Session, on_delete=models.CASCADE)
+#     date = models.DateField()
+
+
+# class AttendanceReport(models.Model):
+#     student = models.ForeignKey(Student, on_delete=models.CASCADE)
+#     attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE)
+#     status = models.BooleanField(default=False)  # Whether student attended or not
+
+
 
 class Attendance(models.Model):
-    """
-    Represents a specific attendance record for a subject on a given date.
-    """
-    session = models.ForeignKey(Session, on_delete=models.DO_NOTHING)
-    subject = models.ForeignKey(Subject, on_delete=models.DO_NOTHING)
-    date = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, null=True, blank=True)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, null=True, blank=True)
+    date = models.DateField(default=timezone.now)
+    is_present = models.BooleanField(default=False)  # If checked, student is Present
+    is_absent = models.BooleanField(default=False)  # New field for Absent checkbox
+
+    class Meta:
+        unique_together = ('student', 'session', 'term', 'date')  # Avoid duplicate attendance
+
+    def __str__(self):
+        return f"{self.student.admin.first_name} - {self.session} - {'Present' if self.is_present else 'Absent' if self.is_absent else 'Not Marked'}"
+    
+# class Attendance(models.Model):
+#     """
+#     Represents a specific attendance record for a subject on a given date.
+#     """
+#     session = models.ForeignKey(Session, on_delete=models.DO_NOTHING)
+#     subject = models.ForeignKey(Subject, on_delete=models.DO_NOTHING)
+#     date = models.DateField()
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
 
 class AttendanceReport(models.Model):
@@ -144,8 +188,8 @@ class AttendanceReport(models.Model):
     student = models.ForeignKey(Student, on_delete=models.DO_NOTHING)
     attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE)
     status = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True) 
 
 
 class LeaveReportStudent(models.Model):
@@ -224,18 +268,22 @@ class NotificationStudent(models.Model):
 
 # ---------- Term and Result Models ----------
 
-class Term(models.Model):
-    """
-    Represents a term within an academic session.
-    Each Session is divided into three terms: 1st Term, 2nd Term, and 3rd Term.
-    """
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='terms')
-    name = models.CharField(max_length=10, choices=[('1st', '1st Term'), ('2nd', '2nd Term'), ('3rd', '3rd Term')])
+# class Term(models.Model):
+#     """
+#     Represents a term within an academic session.
+#     Each Session is divided into three terms: 1st Term, 2nd Term, and 3rd Term.
+#     """
+#     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='terms')
+#     name = models.CharField(max_length=10, choices=[('1st', '1st Term'), ('2nd', '2nd Term'), ('3rd', '3rd Term')])
 
-    def __str__(self):
-        return f"{self.name} Term, {self.session}"
-    
-    
+#     def __str__(self):
+#         return f"{self.name} Term, {self.session}"
+
+
+
+
+
+
 class Result(models.Model):
     """
     Stores results for a student in a subject for a particular term.
@@ -294,13 +342,27 @@ class ResultSummary(models.Model):
     """
     Aggregated result summary for a student.
     """
-    student = models.OneToOneField(Student, on_delete=models.CASCADE)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE)
+    # term = models.ForeignKey(Term, on_delete=models.CASCADE, null=True, blank=True)  # Allow NULL temporarily
+    
+    attendance = models.PositiveIntegerField(default=0, null=True, blank=True)  # Stores days attended
+    days_in_term = models.PositiveIntegerField(default=0, null=True, blank=True)
+    resumption_date = models.DateField(null=True, blank=True)
+    
     total_score = models.DecimalField(max_digits=7, decimal_places=2, default=0)
     average_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     position = models.IntegerField(default=0)
     grade = models.CharField(max_length=2, default='F')
-    teacher_remarks = models.TextField(blank=True)
-    
+    teacher_remarks = models.TextField(blank=True, null=True)
+     # ✅ Add these fields for tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    # created_at = models.DateTimeField(default=now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('student', 'term')  # Ensure uniqueness per student and term
+
     def calculate_grade(self):
         avg = float(self.average_score)
         if avg >= 90:
@@ -319,7 +381,8 @@ class ResultSummary(models.Model):
     def __str__(self):
         return (f"Result Summary for {self.student.admin.last_name}, "
                 f"{self.student.admin.first_name}: Avg {self.average_score}, "
-                f"Pos {self.position}, Grade {self.grade}")
+                f"Pos {self.position}, Grade {self.grade}"
+                f"{self.student.admin.first_name} {self.student.admin.last_name} - {self.term}")
 
 
 class SessionResultSummary(models.Model):
@@ -371,12 +434,12 @@ def create_terms_for_session(sender, instance, created, **kwargs):
         for term_name in term_choices:
             Term.objects.create(session=instance, name=term_name)
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+# from django.db.models.signals import post_save
+# from django.dispatch import receiver
 
-@receiver(post_save, sender=Session)
-def create_default_terms(sender, instance, created, **kwargs):
-    if created:
-        Term.objects.create(session=instance, name="1st")
-        Term.objects.create(session=instance, name="2nd")
-        Term.objects.create(session=instance, name="3rd")
+# @receiver(post_save, sender=Session)
+# def create_default_terms(sender, instance, created, **kwargs):
+#     if created:
+#         Term.objects.create(session=instance, name="1st")
+#         Term.objects.create(session=instance, name="2nd")
+#         Term.objects.create(session=instance, name="3rd")

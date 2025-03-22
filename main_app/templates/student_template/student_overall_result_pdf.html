@@ -1,0 +1,60 @@
+{% load static %}
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overall Result PDF</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 14px; margin: 20px; }
+        .container { width: 100%; max-width: 800px; margin: auto; text-align: center; }
+        h2 { color: #28a745; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #28a745; color: white; }
+        .summary { margin-top: 20px; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Overall Academic Result</h2>
+        <p><strong>Student:</strong> {{ student.admin.first_name }} {{ student.admin.last_name }}</p>
+        <p><strong>Program:</strong> {{ student.program.name }}</p>
+        <p><strong>Academic Session:</strong> {{ session.start_year }} - {{ session.end_year }}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Term</th>
+                    <th>Total Score</th>
+                    <th>Average Score</th>
+                    <th>Grade</th>
+                    <th>Position</th>
+                    <th>Teacher Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for term in terms %}
+                {% with term_results|dict_lookup:term.name as summary %}
+                <tr>
+                    <td>{{ term.name }}</td>
+                    <td>{{ summary.total_score|default:"N/A" }}</td>
+                    <td>{{ summary.average_score|default:"N/A" }}</td>
+                    <td>{{ summary.grade|default:"N/A" }}</td>
+                    <td>{{ summary.position|default:"N/A" }}</td>
+                    <td>{{ summary.teacher_remarks|default:"N/A" }}</td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <p><strong>Final Average:</strong> {{ final_average|floatformat:"2" }}</p>
+            <p><strong>Overall Grade:</strong> {{ final_grade }}</p>
+        </div>
+    </div>
+</body>
+</html>

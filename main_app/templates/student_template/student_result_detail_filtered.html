@@ -22,10 +22,9 @@
       </div>
       <div class="passport">
         {% if student.admin.profile_pic %}
-        <img src="{{ request.user.profile_pic}}" class="img-circle elevation-2" alt="User Image">
-
+          <img src="{{ student.admin.profile_pic.url }}" alt="Student Passport" style="width: 100px; height: 100px;">
         {% else %}
-          <img src="{% static 'dist/img/default_student.png' %}" alt="Default Student Image" style="max-height: 80px;">
+          <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" style="width: 100px; height: 100px;">
         {% endif %}
       </div>
     </div>

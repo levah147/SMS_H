@@ -17,6 +17,34 @@ from .models import *
 # Admin (HOD) Views
 # ------------------------------
 
+# def admin_home(request):
+#     """
+#     Display dashboard statistics for the HOD.
+#     """
+#     total_staff = Staff.objects.all().count()
+#     total_students = Student.objects.all().count()
+#     subjects = Subject.objects.all()
+#     total_subject = subjects.count()
+#     total_course = Program.objects.all().count()  # 'Program' replaces 'course'
+    
+#     # Build attendance data per subject.
+#     attendance_list = []
+#     subject_list = []
+#     for subject in subjects:
+#         attendance_count = Attendance.objects.filter(subject=subject).count()
+#         subject_list.append(subject.name[:7])
+#         attendance_list.append(attendance_count)
+    
+#     context = {
+#         'page_title': "Administrative Dashboard",
+#         'total_students': total_students,
+#         'total_staff': total_staff,
+#         'total_course': total_course,
+#         'total_subject': total_subject,
+#         'subject_list': subject_list,
+#         'attendance_list': attendance_list,
+#     }
+#     return render(request, 'hod_template/home_content.html', context)
 def admin_home(request):
     """
     Display dashboard statistics for the HOD.
@@ -26,15 +54,18 @@ def admin_home(request):
     subjects = Subject.objects.all()
     total_subject = subjects.count()
     total_course = Program.objects.all().count()  # 'Program' replaces 'course'
-    
+
     # Build attendance data per subject.
     attendance_list = []
     subject_list = []
-    for subject in subjects:
-        attendance_count = Attendance.objects.filter(subject=subject).count()
-        subject_list.append(subject.name[:7])
-        attendance_list.append(attendance_count)
-    
+    # for subject in subjects:
+        # ✅ Filter attendance through students enrolled in the subject
+        # attendance_count = Attendance.objects.filter(
+        #     student__subject=subject
+        # ).count()
+        # subject_list.append(subject.name[:7])
+        # attendance_list.append(attendance_count)
+
     context = {
         'page_title': "Administrative Dashboard",
         'total_students': total_students,
@@ -42,9 +73,11 @@ def admin_home(request):
         'total_course': total_course,
         'total_subject': total_subject,
         'subject_list': subject_list,
-        'attendance_list': attendance_list,
+        # 'attendance_list': attendance_list,
     }
     return render(request, 'hod_template/home_content.html', context)
+
+
 
 
 def add_staff(request):
@@ -93,12 +126,59 @@ def add_staff(request):
     return render(request, 'hod_template/add_staff_template.html', context)
 
 
-def add_student(request):
+# def add_student(request):
+#     """
+#     View for adding a new student.
+#     """
+#     student_form = StudentForm(request.POST or None, request.FILES or None)
+#     context = {'form': student_form, 'page_title': 'Add Student'}
+#     if request.method == 'POST':
+#         if student_form.is_valid():
+#             first_name = student_form.cleaned_data.get('first_name')
+#             last_name = student_form.cleaned_data.get('last_name')
+#             address = student_form.cleaned_data.get('address')
+#             email = student_form.cleaned_data.get('email')
+#             gender = student_form.cleaned_data.get('gender')
+#             password = student_form.cleaned_data.get('password')
+#             program = student_form.cleaned_data.get('program')
+#             session = student_form.cleaned_data.get('session')
+#             passport = request.FILES.get('profile_pic')
+#             if passport:
+#                 fs = FileSystemStorage()
+#                 clean_name = os.path.basename(passport.name)
+#                 filename = fs.save(clean_name, passport)
+#                 passport_url = fs.url(filename)
+#             else:
+#                 passport_url = ""
+#             try:
+#                 user = CustomUser.objects.create_user(
+#                     email=email,
+#                     password=password,
+#                     user_type="3",
+#                     first_name=first_name,
+#                     last_name=last_name,
+#                     profile_pic=passport_url
+#                 )
+#                 user.gender = gender
+#                 user.address = address
+#                 user.student.session = session
+#                 user.student.program = program
+#                 user.save()
+#                 messages.success(request, "Student successfully added!")
+#                 return redirect(reverse('add_student'))
+#             except Exception as e:
+#                 messages.error(request, "Could not add student: " + str(e))
+#         else:
+#             messages.error(request, "Could not add student: Please check the form errors.")
+#     return render(request, 'hod_template/add_student_template.html', context)
+
+def add_student(request): 
     """
     View for adding a new student.
     """
     student_form = StudentForm(request.POST or None, request.FILES or None)
     context = {'form': student_form, 'page_title': 'Add Student'}
+    
     if request.method == 'POST':
         if student_form.is_valid():
             first_name = student_form.cleaned_data.get('first_name')
@@ -110,33 +190,43 @@ def add_student(request):
             program = student_form.cleaned_data.get('program')
             session = student_form.cleaned_data.get('session')
             passport = request.FILES.get('profile_pic')
+
+            # 🔹 Ensure profile image is correctly saved
+            passport_url = ""
             if passport:
-                fs = FileSystemStorage()
+                fs = FileSystemStorage(location='media/profile_pics')  # Save inside profile_pics folder
                 clean_name = os.path.basename(passport.name)
                 filename = fs.save(clean_name, passport)
-                passport_url = fs.url(filename)
-            else:
-                passport_url = ""
+                passport_url = f"profile_pics/{filename}"
+
             try:
+                # 🔹 Create CustomUser (Automatically creates Student via signal)
                 user = CustomUser.objects.create_user(
                     email=email,
                     password=password,
                     user_type="3",
                     first_name=first_name,
                     last_name=last_name,
-                    profile_pic=passport_url
+                    profile_pic=passport_url  # Store correct image path
                 )
                 user.gender = gender
                 user.address = address
-                user.student.session = session
-                user.student.program = program
                 user.save()
+
+                # 🔹 Update the existing Student object (created via post_save signal)
+                student = Student.objects.get(admin=user)  # Fetch existing student
+                student.program = program
+                student.session = session
+                student.save()  # Save changes
+
                 messages.success(request, "Student successfully added!")
                 return redirect(reverse('add_student'))
+
             except Exception as e:
                 messages.error(request, "Could not add student: " + str(e))
         else:
             messages.error(request, "Could not add student: Please check the form errors.")
+
     return render(request, 'hod_template/add_student_template.html', context)
 
 
@@ -289,54 +379,112 @@ def edit_staff(request, staff_id):
     return render(request, "hod_template/edit_staff_template.html", context)
 
 
+# def edit_student(request, student_id):
+#     """
+#     Edit an existing student profile.
+#     """
+#     student = get_object_or_404(Student, id=student_id)
+#     form = StudentForm(request.POST or None, instance=student)
+#     context = {
+#         'form': form,
+#         'student_id': student_id,
+#         'page_title': 'Edit Student'
+#     }
+#     if request.method == 'POST':
+#         if form.is_valid():
+#             first_name = form.cleaned_data.get('first_name')
+#             last_name = form.cleaned_data.get('last_name')
+#             address = form.cleaned_data.get('address')
+#             username = form.cleaned_data.get('username')
+#             email = form.cleaned_data.get('email')
+#             gender = form.cleaned_data.get('gender')
+#             password = form.cleaned_data.get('password') or None
+#             program = form.cleaned_data.get('program')
+#             session = form.cleaned_data.get('session')
+#             passport = request.FILES.get('profile_pic') or None
+#             try:
+#                 user = CustomUser.objects.get(id=student.admin.id)
+#                 if passport:
+#                     fs = FileSystemStorage()
+#                     filename = fs.save(os.path.basename(passport.name), passport)
+#                     passport_url = fs.url(filename)
+#                     user.profile_pic = passport_url
+#                 user.username = username
+#                 user.email = email
+#                 if password:
+#                     user.set_password(password)
+#                 user.first_name = first_name
+#                 user.last_name = last_name
+#                 student.session = session
+#                 user.gender = gender
+#                 user.address = address
+#                 student.program = program
+#                 user.save()
+#                 student.save()
+#                 messages.success(request, "Student successfully updated!")
+#                 return redirect(reverse('edit_student', args=[student_id]))
+#             except Exception as e:
+#                 messages.error(request, "Could not update student: " + str(e))
+#         else:
+#             messages.error(request, "Please fill the form properly!")
+#     return render(request, "hod_template/edit_student_template.html", context)
 def edit_student(request, student_id):
     """
     Edit an existing student profile.
     """
     student = get_object_or_404(Student, id=student_id)
-    form = StudentForm(request.POST or None, instance=student)
+    form = StudentForm(request.POST or None, request.FILES or None, instance=student)
+
     context = {
         'form': form,
         'student_id': student_id,
         'page_title': 'Edit Student'
     }
+
     if request.method == 'POST':
         if form.is_valid():
             first_name = form.cleaned_data.get('first_name')
             last_name = form.cleaned_data.get('last_name')
             address = form.cleaned_data.get('address')
-            username = form.cleaned_data.get('username')
             email = form.cleaned_data.get('email')
             gender = form.cleaned_data.get('gender')
             password = form.cleaned_data.get('password') or None
             program = form.cleaned_data.get('program')
             session = form.cleaned_data.get('session')
             passport = request.FILES.get('profile_pic') or None
+
             try:
-                user = CustomUser.objects.get(id=student.admin.id)
-                if passport:
-                    fs = FileSystemStorage()
-                    filename = fs.save(os.path.basename(passport.name), passport)
-                    passport_url = fs.url(filename)
-                    user.profile_pic = passport_url
-                user.username = username
+                user = student.admin  # Get the linked CustomUser
+
+                # Update user fields
                 user.email = email
-                if password:
-                    user.set_password(password)
                 user.first_name = first_name
                 user.last_name = last_name
-                student.session = session
                 user.gender = gender
                 user.address = address
+
+                if password:
+                    user.set_password(password)
+
+                if passport:  # ✅ Assign image directly
+                    user.profile_pic = passport
+
+                user.save()  # ✅ Save CustomUser first
+
+                # Update student fields
                 student.program = program
-                user.save()
+                student.session = session
                 student.save()
+
                 messages.success(request, "Student successfully updated!")
                 return redirect(reverse('edit_student', args=[student_id]))
+
             except Exception as e:
                 messages.error(request, "Could not update student: " + str(e))
+
         else:
             messages.error(request, "Please fill the form properly!")
+
     return render(request, "hod_template/edit_student_template.html", context)
 
 
@@ -570,17 +718,6 @@ def api_fetch_hod_notifications(request):
     
     return JsonResponse({'error': 'Not authenticated'}, status=403)
 
-from django.shortcuts import get_object_or_404, render, redirect, reverse
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib import messages
-from .models import (
-    LeaveReportStaff,
-    LeaveReportStudent,
-    FeedbackStudent,
-    FeedbackStaff
-)
-import datetime
 
 def aggregate_hod_notifications():
     """Aggregate notifications from various sources for the HOD."""
@@ -781,7 +918,7 @@ def send_student_notification(request):
                 'title': "Student Management System",
                 'body': message_text,
                 'click_action': reverse('student_view_notification'),
-                'icon': static('dist/img/1.png')
+                # 'icon': static('dist/img/2.png')
             },
             'to': student.admin.fcm_token
         }
@@ -812,7 +949,7 @@ def send_staff_notification(request):
                 'title': "Student Management System",
                 'body': message_text,
                 'click_action': reverse('staff_view_notification'),
-                'icon': static('dist/img/1.png')
+                # 'icon': static('dist/img/2.png')
             },
             'to': staff_obj.admin.fcm_token
         }

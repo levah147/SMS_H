@@ -11,6 +11,10 @@ urlpatterns = [
     path("firebase-messaging-sw.js", views.showFirebaseJS, name='showFirebaseJS'),
     path("doLogin/", views.doLogin, name='user_login'),
     path("logout_user/", views.logout_user, name='user_logout'),
+    path("staff/mark-attendance/", staff_views.mark_attendance, name="mark_attendance"),  # Ensure this exists
+    path("staff/calculate-days-in-term/", staff_views.calculate_days_in_term, name="calculate_days_in_term"),
+
+
 
     # HOD Views
     path("admin/home/", hod_views.admin_home, name='admin_home'),
@@ -88,6 +92,7 @@ urlpatterns = [
      path('get_terms/', staff_views.get_terms, name='get_terms'),
      path('get_terms/', staff_views.get_terms, name='get_terms'),
      path('result/filtered/', staff_views.staff_view_result_filtered, name='staff_view_result_filtered'),
+     path("get_attendance/", staff_views.staff_views_get_attendance, name="staff_views_get_attendance"),
     # path('api/notifications/', staff_views.api_fetch_notifications, name='api_fetch_notifications'),
     # path('staff/notifications/ajax/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
     # path('ajax/get-notifications/', staff_views.ajax_get_notifications, name='ajax_get_notifications'),
@@ -125,7 +130,13 @@ urlpatterns = [
     # Student Notifications
     path('ajax/get-notifications-student/', student_views.ajax_get_notifications_student, name='ajax_get_notifications_student'),
     path('ajax/mark-notifications-read-student/', student_views.ajax_mark_notifications_read_student, name='ajax_mark_notifications_read_student'),
+    path("staff/students/", staff_views.staff_student_attendance, name="staff_student_attendance"),
+    path("staff/mark-attendance/", staff_views.mark_attendance, name="mark_attendance"),
+    path('staff/mark-attendance/', staff_views.bulk_mark_attendance, name='bulk_mark_attendance'),
+    path("staff/students/", staff_views.staff_student_attendance, name="staff_student_attendance"),
+    path("staff/mark-attendance/", staff_views.bulk_mark_attendance, name="bulk_mark_attendance"),  # Ensure this exists
 
+   
 
 
      
@@ -149,15 +160,21 @@ urlpatterns = [
     path("student/result/pdf/", student_views.student_result_pdf, name="student_result_pdf"),
     path('result/filtered/', student_views.student_result_detail_filtered, name='student_result_detail_filtered'),
     path('results/', student_views.student_results_list, name='student_results_list'),
-    path('get_terms/', student_views.get_terms, name='get_terms'),
-    path('get_terms/', student_views.get_terms, name='get_terms'),
+    path('get_terms_student/', student_views.get_terms_student, name='get_terms_student'),
+    
     # ... your other URL patterns ...
     path('student/result/filtered/', student_views.student_result_detail_filtered, name='student_result_detail_filtered'),
     # ... your other url patterns ...
       # ... other URL patterns for student ...
     path('ajax/student/notifications/', student_views.ajax_student_notifications, name='ajax_student_notifications'),
     path('ajax/staff/notifications/', staff_views.ajax_staff_notifications3, name='ajax_staff_notifications3'),
-    
+    # path('student/results/', student_views.student_results_list, name="student_results_list"),
+    path('student/overall_result/<int:session_id>/', student_views.student_overall_result, name="student_overall_result"),
+    path('student/overall-result/pdf/<int:session_id>/', student_views.student_overall_result_pdf, name='student_overall_result_pdf'),
+    # path('student/overall-result/pdf/<int:student_id>/<int:session_id>/', student_views.student_overall_result_pdf, name='student_overall_result_pdf'),
+    # path('student/overall-result/pdf/<int:student_id>/', student_views.student_overall_result_pdf, name='student_overall_result_pdf'),
+
+
 
 
 

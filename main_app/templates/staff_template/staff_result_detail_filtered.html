@@ -1,61 +1,114 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
 
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">{{ page_title }}</h2>
+<link rel="stylesheet" href="{% static 'base.css' %}">
 
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Student Details</h5>
-            <p><strong>Name:</strong> {{ student.admin.last_name }} {{ student.admin.first_name }}</p>
-            <p><strong>Session:</strong> {{ session.start_year }} - {{ session.end_year }}</p>
-            <p><strong>Term:</strong> {{ term.name }} Term</p>
-            <p><strong>Program:</strong> {{ student.program.name }}</p>
-            <p><strong>Resumption Date:</strong> {{ resumption_date }}</p>
-            <p><strong>No of Days in Term:</strong> {{ total_days_in_term }}</p>
-            <p><strong>Attendance:</strong> {{ total_attendance }} days present</p>
-            <p><strong>No in Class:</strong> {{ total_students_in_class }}</p>
-            <p><strong>Position:</strong> {{ position }}</p>
-            <p><strong>Teacher's Remarks:</strong> {{ summary.teacher_remarks }}</p>
-        </div>
+<div class="report-card">
+  <!-- Header Section -->
+  <div class="header">
+    <div class="header-content">
+      <div class="logo">
+        <img src="{% static 'dist/img/2.png' %}" alt="School Logo">
+      </div>
+      <div class="school-info">
+        <h1 style="color: #28a745; font-weight: 700;">HIBISCUS ROYAL ACADEMY</h1>
+        <p>Academic Session: {{ session.start_year }} - {{ session.end_year }}</p>
+        <p>Term: {% if term %}{{ term.name }}{% else %}N/A{% endif %}</p>
+        <p>Website: www.yourschooldomain.com</p>
+        <p>Tel: +234XXXXXXXXX - Email: info@yourschooldomain.com</p>
+      </div>
+      <div class="passport">
+        {% if student.admin.profile_pic %}
+          <img src="{{ student.admin.profile_pic.url }}" alt="Student Passport" style="width: 100px; height: 100px;">
+        {% else %}
+          <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" style="width: 100px; height: 100px;">
+        {% endif %}
+      </div>
     </div>
+    <h2 class="report-title">End of Term Report Sheet</h2>
+  </div>
 
-    <h4 class="mt-4">Results Breakdown</h4>
-    {% if results %}
-        <div class="table-responsive">
-            <table class="table table-striped table-bordered">
-                <thead class="thead-light">
-                    <tr>
-                        <th>Subject</th>
-                        <th>CA Test 1</th>
-                        <th>CA Test 2</th>
-                        <th>Exam Score</th>
-                        <th>Total Score</th>
-                        <th>Grade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for result in results %}
-                    <tr>
-                        <td>{{ result.subject.name }}</td>
-                        <td>{{ result.ca_test1 }}</td>
-                        <td>{{ result.ca_test2 }}</td>
-                        <td>{{ result.exam_score }}</td>
-                        <td>{{ result.total_score }}</td>
-                        <td>{{ result.grade }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <p>No results found for this student.</p>
-    {% endif %}
+  <!-- Student Info Section -->
+  <table class="student-info">
+    <tr>
+        <td class="label">Student Name</td>
+        <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
+        <td class="label">Gender</td>
+        <td>{{ student.admin.get_gender_display }}</td>
+    </tr>
+    <tr>
+        <td class="label">Admission Number</td>
+        <td>{{ student.admin.email }}</td>
+        <td class="label">No in Class</td>
+        <td>{{ no_in_class }}</td>
+    </tr>
+    <tr>
+        <td class="label">Class Group</td>
+        <td>{{ student.program.name }}</td>
+        <td class="label">Resumption Date</td>
+        <td>{% if resumption_date %}{{ resumption_date }}{% else %}N/A{% endif %}</td>
+    </tr>
+    <tr>
+        <td class="label">No of Days in Term</td>
+        <td>{{ days_in_term }}</td>
+        <td class="label">Attendance</td>
+        <td>{{ attendance }}</td>
+    </tr>
+  </table>
+
+  <!-- Academic Performance Table -->
+  <table class="academic-table">
+    <thead>
+      <tr>
+        <th>S/N</th>
+        <th>Subject</th>
+        <th>CAT 1 (30)</th>
+        <th>CAT 2 (10)</th>
+        <th>EXAM (60)</th>
+        <th>TOTAL (100)</th>
+        <th>GRADE</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for result in results %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ result.subject.name }}</td>
+        <td>{{ result.ca_test1 }}</td>
+        <td>{{ result.ca_test2 }}</td>
+        <td>{{ result.exam_score }}</td>
+        <td>{{ result.total_score }}</td>
+        <td>{{ result.grade }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center">No results available for this term.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Result Summary Section -->
+  <div class="total-score">
+      <div><strong>Grand Total Score:</strong> {{ summary.total_score }}</div>
+      <div><strong>Final Average:</strong> {{ summary.average_score|floatformat:"2" }}</div>
+      <div><strong>Position:</strong> {{ summary.position|default:"N/A" }}</div>
+      <div><strong>Final Grade:</strong> {{ summary.grade }}</div>
+  </div>
+  <div class="remarks-section">
+      <h4>Teacher's Remarks</h4>
+      <p>{{ summary.teacher_remarks }}</p>
+  </div>
+
+  <!-- Print Button -->
+  <div class="no-print text-center mt-3">
+    <a href="{% url 'staff_result_pdf' student.id %}" target="_blank" class="btn btn-primary">Print PDF</a>
+  </div>
 </div>
-
-{% endblock %}
-
+{% endblock content %}
 
 
 
@@ -75,60 +128,56 @@
         <img src="{% static 'dist/img/2.png' %}" alt="School Logo">
       </div>
       <div class="school-info">
-        <h1 style="color: #28a745;  font-weight: 700;">HIBISCUS ROYAL ACADEMY </h1>
+        <h1 style="color: #28a745; font-weight: 700;">HIBISCUS ROYAL ACADEMY</h1>
         
         <p>Academic Session: {{ student.session }}</p>
-        <p>Term: {% if summary.term %}{{ summary.term.name }}{% else %}N/A{% endif %}</p>
+        <p>Term: {% if term %}{{ term.name }}{% else %}N/A{% endif %}</p>
         <p>Website: www.yourschooldomain.com</p>
         <p>Tel: +234XXXXXXXXX - Email: info@yourschooldomain.com</p>
       </div>
       <div class="passport">
         {% if student.admin.profile_pic %}
-          <img src="{{ student.admin.profile_pic.url }}" alt="Student Passport">
+          <img src="{{ student.admin.profile_pic.url }}" alt="Student Passport" style="width: 100px; height: 100px;">
         {% else %}
-          <img src="{% static 'dist/img/default_student.png' %}" alt="Default Student Image">
+          <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" style="width: 100px; height: 100px;">
         {% endif %}
       </div>
     </div>
     <h2 class="report-title">End of Term Report Sheet</h2>
     <h3 class="academic-year">
-      {% if summary.term %}{{ summary.term.name }} Term{% else %}Term N/A{% endif %} - Academic Session: {{ student.session }}
+      {% if term %}{{ term.name }} Term{% else %}Term N/A{% endif %} - Academic Session: {{ student.session }}
     </h3>
   </div>
 
   <!-- Student Info Section -->
-  <table class="student-info">
-    <tr>
+ <!-- Student Info Section -->
+<table class="student-info">
+  <tr>
       <td class="label">Student Name</td>
       <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
       <td class="label">Gender</td>
-      {% if student.admin.gender == "F" %}
-  <td>Female</td>
-{% elif student.admin.gender == "M" %}
-  <td>Male</td>
-{% endif %}
-
-      {% comment %} <td>{{ student.admin.gender }}</td> 
-    </tr>
-    <tr>
+      <td>{% if student.admin.gender == "F" %}Female{% elif student.admin.gender == "M" %}Male{% endif %}</td>
+  </tr>
+  <tr>
       <td class="label">Admission Number</td>
       <td>{{ student.admin.email }}</td>
       <td class="label">No in Class</td>
-      <td><!-- You can add this if available --></td>
-    </tr>
-    <tr>
+      <td>{{ no_in_class }}</td>
+  </tr>
+  <tr>
       <td class="label">Class Group</td>
       <td>{{ student.program.name }}</td>
       <td class="label">Resumption Date</td>
-      <td><!-- Add resumption date if available --></td>
-    </tr>
-    <tr>
+      <td>{% if summary.resumption_date %}{{ summary.resumption_date }}{% else %}N/A{% endif %}</td>
+  </tr>
+  <tr>
       <td class="label">No of Days in Term</td>
-      <td><!-- Insert days value here --></td>
+      <td>{% if summary.days_in_term %}{{ summary.days_in_term }}{% else %}N/A{% endif %}</td>
       <td class="label">Attendance</td>
-      <td><!-- Insert attendance percentage if available --></td>
-    </tr>
-  </table>
+      <td>{% if summary.attendance %}{{ summary.attendance }}{% else %}N/A{% endif %}</td>
+  </tr>
+</table>
+
 
   <!-- Academic Performance Table -->
   <table class="academic-table">
@@ -141,7 +190,6 @@
         <th>EXAM (0–60)</th>
         <th>TOTAL (100)</th>
         <th>GRADE</th>
-        <th>Teacher's Remarks</th>
       </tr>
     </thead>
     <tbody>
@@ -154,7 +202,10 @@
         <td>{{ result.exam_score }}</td>
         <td>{{ result.total_score }}</td>
         <td>{{ result.grade }}</td>
-        <td><!-- You could show subject-specific remarks if available --></td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center">No results available for this term.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -163,20 +214,21 @@
   <!-- Result Summary Section -->
   {% if summary %}
   <div class="total-score">
-    <div><strong>Grand Total Score:</strong> {{ summary.total_score }}</div>
-    <div><strong>Final Average:</strong> {{ summary.average_score|floatformat:"2" }}</div>
-    <div><strong>Position:</strong> {{ summary.position }}</div>
-    <div><strong>Final Grade:</strong> {{ summary.grade }}</div>
-  </div> 
+      <div><strong>Grand Total Score:</strong> {% if summary.total_score %}{{ summary.total_score }}{% else %}N/A{% endif %}</div>
+      <div><strong>Final Average:</strong> {% if summary.average_score %}{{ summary.average_score|floatformat:"2" }}{% else %}N/A{% endif %}</div>
+      <div><strong>Position:</strong> {% if summary.position and summary.position > 0 %}{{ summary.position }}{% else %}N/A{% endif %}</div>
+      <div><strong>Final Grade:</strong> {{ summary.grade }}</div>
+  </div>
   <div class="remarks-section">
-    <h4>Teacher's Remarks</h4>
-    <p>{{ summary.teacher_remarks }}</p>
+      <h4>Teacher's Remarks</h4>
+      <p>{{ summary.teacher_remarks }}</p>
   </div>
   {% else %}
-    <p class="text-warning">No summary available for this student.</p>
+  <p class="text-warning">No summary available for this student.</p>
   {% endif %}
+  
 
-  <!-- Optionally add a print button -->
+  <!-- Print Button -->
   <div class="no-print" style="text-align: center; margin-top: 20px;">
     <a href="{% url 'staff_result_pdf' student.id %}" target="_blank" class="btn btn-primary">Print PDF</a>
   </div>

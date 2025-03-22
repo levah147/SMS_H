@@ -33,16 +33,16 @@ def student_home(request):
     data_absent = []
     subjects = Subject.objects.filter(program=student.program)
     for subject in subjects:
-        attendance = Attendance.objects.filter(subject=subject)
-        present_count = AttendanceReport.objects.filter(
-            attendance__in=attendance, status=True, student=student
-        ).count()
-        absent_count = AttendanceReport.objects.filter(
-            attendance__in=attendance, status=False, student=student
-        ).count()
+        # attendance = Attendance.objects.filter(subject=subject)
+        # present_count = AttendanceReport.objects.filter(
+        #     attendance__in=attendance, status=True, student=student
+        # ).count()
+        # absent_count = AttendanceReport.objects.filter(
+        #     attendance__in=attendance, status=False, student=student
+        # ).count()
         subject_names.append(subject.name)
-        data_present.append(present_count)
-        data_absent.append(absent_count)
+        # data_present.append(present_count)
+        # data_absent.append(absent_count)
 
     context = {
         'total_attendance': total_attendance,
@@ -160,7 +160,9 @@ def student_view_profile(request):
                     fs = FileSystemStorage()
                     filename = fs.save(os.path.basename(passport.name), passport)
                     passport_url = fs.url(filename)
-                    admin.profile_pic = passport_url
+                    admin.profile_pic = filename  # Save the relative path
+                    # admin.profile_pic = passport_url
+                    
                 admin.first_name = first_name
                 admin.last_name = last_name
                 admin.address = address
@@ -264,52 +266,7 @@ def student_view_result(request, student_id):
     return render(request, "student_template/student_view_result.html", context)
 
 
-from django.shortcuts import get_object_or_404, render, redirect, reverse
-from .models import Student, Result, Session, Term
-from django.contrib import messages
 
-def student_results_list(request):
-    student = get_object_or_404(Student, admin=request.user)
-    sessions = Session.objects.all()
-    terms = Term.objects.all()
-    
-    # Read selected session and term from GET parameters.
-    selected_session_id = request.GET.get('session', '')
-    selected_term_id = request.GET.get('term', '')
-    
-    results = None
-    if selected_session_id and selected_term_id:
-        session = get_object_or_404(Session, id=selected_session_id)
-        term = get_object_or_404(Term, id=selected_term_id, session=session)
-        results = Result.objects.filter(student=student, term=term)
-    
-    context = {
-        'student': student,
-        'sessions': sessions,
-        'terms': terms,
-        'selected_session_id': selected_session_id,
-        'selected_term_id': selected_term_id,
-        'results': results,
-        'page_title': 'My Results',
-    }
-    return render(request, "student_template/student_results_list.html", context)
-
-
-
-
-
-from django.http import JsonResponse
-from .models import Term
-from django.views.decorators.csrf import csrf_exempt
-
-@csrf_exempt
-def get_terms(request):
-    session_id = request.POST.get('session')
-    if session_id:
-        terms = Term.objects.filter(session_id=session_id)
-        data = [{'id': term.id, 'name': term.name} for term in terms]
-        return JsonResponse(data, safe=False)
-    return JsonResponse([], safe=False)
 
 from weasyprint import HTML, CSS
 from django.template.loader import get_template
@@ -428,3 +385,410 @@ def student_result_detail_filtered(request):
         'page_title': "Filtered Result Detail",
     }
     return render(request, "student_template/student_result_detail_filtered.html", context)
+
+# def student_results_list(request):
+#     student = get_object_or_404(Student, admin=request.user)
+#     sessions = Session.objects.all()
+#     terms = Term.objects.all()
+    
+#     # Read selected session and term from GET parameters.
+#     selected_session_id = request.GET.get('session', '')
+#     selected_term_id = request.GET.get('term', '')
+    
+#     results = None
+#     if selected_session_id and selected_term_id:
+#         session = get_object_or_404(Session, id=selected_session_id)
+#         term = get_object_or_404(Term, id=selected_term_id, session=session)
+#         results = Result.objects.filter(student=student, term=term)
+    
+#     context = {
+#         'student': student,
+#         'sessions': sessions,
+#         'terms': terms,
+#         'selected_session_id': selected_session_id,
+#         'selected_term_id': selected_term_id,
+#         'results': results,
+#         'page_title': 'My Results',
+#     }
+#     return render(request, "student_template/student_results_list.html", context)
+def student_results_list(request):
+    student = get_object_or_404(Student, admin=request.user)
+    sessions = Session.objects.all()
+    terms = Term.objects.all()
+    
+    # Read selected session and term from GET parameters.
+    selected_session_id = request.GET.get('session', '')
+    selected_term_id = request.GET.get('term', '')
+    
+    results = None
+    if selected_session_id and selected_term_id:
+        session = get_object_or_404(Session, id=selected_session_id)
+        term = get_object_or_404(Term, id=selected_term_id, session=session)
+        results = Result.objects.filter(student=student, term=term)
+    
+    context = {
+        'student': student,
+        'sessions': sessions,
+        'terms': terms,
+        'selected_session_id': selected_session_id,  # ✅ Retain selected session
+        'selected_term_id': selected_term_id,  # ✅ Retain selected term
+        'results': results,
+        'page_title': 'My Results',
+    }
+    return render(request, "student_template/student_results_list.html", context)
+
+
+@csrf_exempt  # Disable CSRF for testing (REMOVE in production)
+def get_terms_student(request):
+    """Fetch terms only for the selected session."""
+    if request.method == "POST":
+        session_id = request.POST.get("session")
+        if session_id:
+            terms = Term.objects.filter(session_id=session_id).values("id", "name")
+            return JsonResponse(list(terms), safe=False)
+    
+    return JsonResponse([], safe=False)  # Return empty list if no session is selected
+
+
+
+
+# def student_overall_result(request, session_id):
+#     student = get_object_or_404(Student, admin=request.user)
+#     session = get_object_or_404(Session, id=session_id)
+#     terms = Term.objects.filter(session=session)
+    
+#     term_results = {}
+#     total_score = 0
+#     total_subjects = 0
+
+#     for term in terms:
+#         results = Result.objects.filter(student=student, term=term)
+#         term_results[term] = results
+#         for result in results:
+#             total_score += result.total_score
+#             total_subjects += 1
+
+#     # Calculate average score
+#     average_score = total_score / total_subjects if total_subjects > 0 else 0
+
+#     # Determine final grade
+#     if average_score >= 90:
+#         final_grade = 'A+'
+#     elif average_score >= 80:
+#         final_grade = 'A'
+#     elif average_score >= 70:
+#         final_grade = 'B'
+#     elif average_score >= 60:
+#         final_grade = 'C'
+#     elif average_score >= 50:
+#         final_grade = 'D'
+#     else:
+#         final_grade = 'F'
+
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'term_results': term_results,
+#         'total_score': total_score,
+#         'average_score': round(average_score, 2),
+#         'final_grade': final_grade,
+#         'page_title': f"Overall Results for {session.start_year} - {session.end_year}"
+#     }
+
+#     return render(request, 'student_template/student_overall_result.html', context)
+def student_overall_result(request, session_id):
+    student = get_object_or_404(Student, admin=request.user)
+    session = get_object_or_404(Session, id=session_id)
+    terms = Term.objects.filter(session=session)
+
+    term_results = {}
+    total_score = 0
+    total_subjects = 0
+
+    for term in terms:
+        results = Result.objects.filter(student=student, term=term)
+        term_summary = ResultSummary.objects.filter(student=student, term=term).first()
+
+        # Get student's position if summary exists
+        position = term_summary.position if term_summary else "N/A"
+
+        term_results[term] = {
+            "results": results,
+            "total_score": sum(result.total_score for result in results),
+            "average_score": round(sum(result.total_score for result in results) / results.count(), 2) if results.exists() else "N/A",
+            "grade": term_summary.grade if term_summary else "N/A",
+            "position": position
+        }
+
+        for result in results:
+            total_score += result.total_score
+            total_subjects += 1
+
+    # Calculate overall average score
+    average_score = total_score / total_subjects if total_subjects > 0 else 0
+
+    # Determine final grade
+    if average_score >= 90:
+        final_grade = 'A+'
+    elif average_score >= 80:
+        final_grade = 'A'
+    elif average_score >= 70:
+        final_grade = 'B'
+    elif average_score >= 60:
+        final_grade = 'C'
+    elif average_score >= 50:
+        final_grade = 'D'
+    else:
+        final_grade = 'F'
+
+    context = {
+        'student': student,
+        'session': session,
+        'term_results': term_results,
+        'total_score': total_score,
+        'average_score': round(average_score, 2),
+        'final_grade': final_grade,
+        'page_title': f"Overall Results for {session.start_year} - {session.end_year}"
+    }
+
+    return render(request, 'student_template/student_overall_result.html', context)
+
+
+
+
+
+
+
+
+
+
+# def student_overall_result_pdf(request, session_id):
+#     student = get_object_or_404(Student, admin=request.user)
+#     session = get_object_or_404(Session, id=session_id)
+#     terms = Term.objects.filter(session=session)
+    
+#     term_results = {}
+#     total_score = 0
+#     total_subjects = 0
+
+#     for term in terms:
+#         results = Result.objects.filter(student=student, term=term)
+#         term_results[term] = results
+#         for result in results:
+#             total_score += result.total_score
+#             total_subjects += 1
+
+#     average_score = total_score / total_subjects if total_subjects > 0 else 0
+
+#     # Determine final grade
+#     if average_score >= 90:
+#         final_grade = 'A+'
+#     elif average_score >= 80:
+#         final_grade = 'A'
+#     elif average_score >= 70:
+#         final_grade = 'B'
+#     elif average_score >= 60:
+#         final_grade = 'C'
+#     elif average_score >= 50:
+#         final_grade = 'D'
+#     else:
+#         final_grade = 'F'
+
+#     if student.admin.profile_pic:
+#         profile_pic_absolute = request.build_absolute_uri(student.admin.profile_pic.url)
+#     else:
+#         profile_pic_absolute = request.build_absolute_uri(static('dist/img/avatar5.png'))
+
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'term_results': term_results,
+#         'total_score': total_score,
+#         'average_score': round(average_score, 2),
+#         'final_grade': final_grade,
+#         'profile_pic_absolute': profile_pic_absolute,
+#         'request': request
+#     }
+
+#     template = get_template("student_template/student_overall_result_pdf.html")
+#     html_string = template.render(context)
+#     base_url = request.build_absolute_uri('/')
+#     css_string = """
+#     @page { size: A4; margin: 10mm; }
+#     body footer { display: none; }
+#     body::after {
+#         content: "Hibiscus Royal Academy";
+#         position: fixed;
+#         bottom: 10mm;
+#         right: 10mm;
+#         font-size: 40px;
+#         color: rgba(0, 0, 0, 0.15);
+#         transform: rotate(-45deg);
+#         z-index: 9999;
+#     }
+#     """
+#     css = CSS(string=css_string)
+#     html = HTML(string=html_string, base_url=base_url)
+#     pdf_file = html.write_pdf(stylesheets=[css])
+
+#     response = HttpResponse(pdf_file, content_type='application/pdf')
+#     response['Content-Disposition'] = f'inline; filename="overall_result_{session.id}.pdf"'
+#     return response
+# def student_overall_result_pdf(request, session_id):
+#     student = get_object_or_404(Student, admin=request.user)
+#     session = get_object_or_404(Session, id=session_id)
+
+#     # Get all term summaries for this student in the session
+#     overall_results = ResultSummary.objects.filter(student=student, term__session=session)
+
+#     # Calculate final average and overall grade
+#     total_score = sum(result.total_score for result in overall_results)
+#     num_terms = overall_results.count()
+#     final_average = total_score / num_terms if num_terms > 0 else 0
+
+#     if final_average >= 90:
+#         final_grade = 'A+'
+#     elif final_average >= 80:
+#         final_grade = 'A'
+#     elif final_average >= 70:
+#         final_grade = 'B'
+#     elif final_average >= 60:
+#         final_grade = 'C'
+#     elif final_average >= 50:
+#         final_grade = 'D'
+#     else:
+#         final_grade = 'F'
+
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'overall_results': overall_results,
+#         'final_average': final_average,
+#         'final_grade': final_grade
+#     }
+
+#     # Render template to HTML
+#     template = get_template("student_template/student_overall_result_pdf.html")
+#     html_string = template.render(context)
+#     base_url = request.build_absolute_uri('/')
+
+#     # Generate PDF
+#     pdf_file = HTML(string=html_string, base_url=base_url).write_pdf()
+
+#     # Return PDF response
+#     response = HttpResponse(pdf_file, content_type="application/pdf")
+#     response["Content-Disposition"] = f'inline; filename="Overall_Result_{student.id}.pdf"'
+#     return response
+
+
+
+def student_overall_result_pdf(request, session_id):
+    student = get_object_or_404(Student, admin=request.user)
+    session = get_object_or_404(Session, id=session_id)
+
+    # Ensure all terms (1st, 2nd, 3rd) for the session are retrieved
+    terms = Term.objects.filter(session=session).order_by('name')
+    overall_results = ResultSummary.objects.filter(student=student, term__in=terms).order_by('term__name')
+
+    # Ensure we display all terms even if a result summary is missing
+    term_results = {term.name: None for term in terms}  # Create a dictionary for all terms
+    for summary in overall_results:
+        term_results[summary.term.name] = summary  # Assign results to respective terms
+
+    # Calculate final average and overall grade
+    total_score = sum(result.total_score for result in overall_results if result)
+    num_terms = sum(1 for result in overall_results if result)  # Count terms with results
+    final_average = total_score / num_terms if num_terms > 0 else 0
+
+    # Determine final grade
+    if final_average >= 90:
+        final_grade = 'A+'
+    elif final_average >= 80:
+        final_grade = 'A'
+    elif final_average >= 70:
+        final_grade = 'B'
+    elif final_average >= 60:
+        final_grade = 'C'
+    elif final_average >= 50:
+        final_grade = 'D'
+    else:
+        final_grade = 'F'
+
+    context = {
+        'student': student,
+        'session': session,
+        'terms': terms,
+        'term_results': term_results,
+        'final_average': final_average,
+        'final_grade': final_grade,
+    }
+
+    # Render template to HTML
+    template = get_template("student_template/student_overall_result_pdf.html")
+    html_string = template.render(context)
+    base_url = request.build_absolute_uri('/')
+
+    # Generate PDF
+    pdf_file = HTML(string=html_string, base_url=base_url).write_pdf()
+
+    # Return PDF response
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="Overall_Result_{student.id}.pdf"'
+    return response
+
+# from django.shortcuts import get_object_or_404, render
+# from .models import Student, Term, ResultSummary, Session
+
+# def student_overall_result_pdf(request, student_id):
+#     student = get_object_or_404(Student, id=student_id)
+#     sessions = Session.objects.all()
+    
+#     # Get all terms of this student’s session
+#     terms = Term.objects.filter(session__in=sessions)
+    
+#     # Fetch ResultSummary for each term
+#     term_results = {
+#         term.name: ResultSummary.objects.filter(student=student, term=term).first()
+#         for term in terms
+#     }
+
+#     print("DEBUG: Term Results:", term_results)  # Debugging step
+
+#     context = {
+#         'student': student,
+#         'sessions': sessions,
+#         'terms': terms,
+#         'term_results': term_results,
+#         'page_title': "Student Overall Result PDF"
+#     }
+    
+#     return render(request, "student_template/student_overall_result_pdf.html", context)
+
+
+# from django.shortcuts import get_object_or_404, render
+# from .models import Student, Term, ResultSummary, Session
+
+# def student_overall_result_pdf(request, student_id, session_id):
+#     student = get_object_or_404(Student, id=student_id)
+#     session = get_object_or_404(Session, id=session_id)
+    
+#     # Get all terms within the session
+#     terms = Term.objects.filter(session=session)
+
+#     # Fetch ResultSummary for each term
+#     term_results = {
+#         term.name: ResultSummary.objects.filter(student=student, term=term).first()
+#         for term in terms
+#     }
+
+#     print("DEBUG: Term Results:", term_results)  # Debugging step
+
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'terms': terms,
+#         'term_results': term_results,
+#         'page_title': "Student Overall Result PDF"
+#     }
+    
+#     return render(request, "student_template/student_overall_result_pdf.html", context)

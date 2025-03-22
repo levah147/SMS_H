@@ -19,8 +19,9 @@
       <div class="card-body">
         <form method="POST" id="resultForm">
           {% csrf_token %}
+
           <!-- Student Dropdown -->
-          <div class="form-group mb-3">
+          <div class="form-group">
             <label for="student">Select Student</label>
             <select name="student" id="student" class="form-control" required>
               <option value="">-- Select Student --</option>
@@ -31,7 +32,7 @@
           </div>
 
           <!-- Academic Session Dropdown -->
-          <div class="form-group mb-3">
+          <div class="form-group">
             <label for="session">Select Academic Session</label>
             <select name="session" id="session" class="form-control" required>
               <option value="">-- Select Session --</option>
@@ -41,68 +42,78 @@
             </select>
           </div>
 
-          <!-- Term Dropdown (initially empty) -->
-          <div class="form-group mb-3">
+          <!-- Term Dropdown -->
+          <div class="form-group">
             <label for="term">Select Term</label>
             <select name="term" id="term" class="form-control" required>
               <option value="">-- Select Term --</option>
             </select>
           </div>
 
-          <!-- NEW: Additional Information -->
-          <div class="card p-3 mb-3 bg-light">
-            <h5 class="mb-3">Additional Student Info</h5>
-            <p><strong>Resumption Date:</strong> <span id="resumptionDate">N/A</span></p>
-            <p><strong>No of Days in Term:</strong> <span id="daysInTerm">N/A</span></p>
-            <p><strong>Attendance:</strong> <span id="attendance">N/A</span></p>
-            <p><strong>No in Class:</strong> <span id="noInClass">N/A</span></p>
+          <!-- Beginning and End of Term -->
+          <div class="row">
+            <div class="col-md-6">
+              <label for="beginning_of_term">Beginning of Term</label>
+              <input type="date" id="beginning_of_term" name="beginning_of_term" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label for="end_of_term">End of Term</label>
+              <input type="date" id="end_of_term" name="end_of_term" class="form-control" required>
+            </div>
+          </div>
+
+          <!-- Additional Term Details -->
+          <div class="form-group">
+            <label for="resumption_date">Resumption Date</label>
+            <input type="date" id="resumption_date" name="resumption_date" class="form-control" required>
+          </div>
+
+          <!-- Number of Days in Term -->
+          <div class="form-group mt-3">
+            <label for="days_in_term">No of Days in Term</label>
+            <input type="number" id="days_in_term" name="days_in_term" class="form-control" min="1" required readonly>
+          </div>
+
+          <!-- Attendance -->
+          <div class="form-group">
+            <label for="attendance">Attendance (Days Present)</label>
+            <input type="number" id="attendance" name="attendance" class="form-control" min="0" required readonly>
           </div>
 
           <!-- Subject Results Table -->
           <div class="table-responsive">
             <table class="table table-bordered">
-              <thead class="thead-light">
-                <tr>
-                  <th>Subject</th>
-                  <th>CAT1 (30 Marks)</th>
-                  <th>CAT2 (10 Marks)</th>
-                  <th>EXAM (60 Marks)</th>
-                  <th>TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for subject in subjects %}
-                <tr class="subject-row">
-                  <td>
-                    {{ subject.name }}
-                    <input type="hidden" name="subject_{{ subject.id }}" value="{{ subject.id }}">
-                  </td>
-                  <td>
-                    <input type="number" class="form-control ca1" name="ca_test1_{{ subject.id }}" min="0" max="30" step="0.01" required>
-                  </td>
-                  <td>
-                    <input type="number" class="form-control ca2" name="ca_test2_{{ subject.id }}" min="0" max="10" step="0.01" required>
-                  </td>
-                  <td>
-                    <input type="number" class="form-control exam" name="exam_{{ subject.id }}" min="0" max="60" step="0.01" required>
-                  </td>
-                  <td>
-                    <input type="number" class="form-control total" readonly>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
+                <thead class="thead-light">
+                    <tr>
+                        <th>Subject</th>
+                        <th>CAT1 (30 Marks)</th>
+                        <th>CAT2 (10 Marks)</th>
+                        <th>EXAM (60 Marks)</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject in subjects %}
+                    <tr>
+                        <td>{{ subject.name }}</td>
+                        <td><input type="number" name="ca_test1_{{ subject.id }}" class="form-control ca1" min="0" max="30" required></td>
+                        <td><input type="number" name="ca_test2_{{ subject.id }}" class="form-control ca2" min="0" max="10" required></td>
+                        <td><input type="number" name="exam_{{ subject.id }}" class="form-control exam" min="0" max="60" required></td>
+                        <td><input type="number" class="form-control total-score" readonly></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
           </div>
 
           <!-- Teacher's Remarks -->
-          <div class="remarks-section mt-4">
-            <h4>Teacher's Remarks</h4>
-            <textarea name="teacher_remarks" class="form-control" rows="4" placeholder="Enter remarks about the student's performance..." required></textarea>
+          <div class="form-group">
+            <label for="teacher_remarks">Teacher's Remarks</label>
+            <textarea name="teacher_remarks" id="teacher_remarks" class="form-control" rows="3" placeholder="Enter remarks..." required></textarea>
           </div>
 
           <!-- Save Button -->
-          <div class="text-center mt-4">
+          <div class="text-center">
             <button type="submit" class="btn btn-primary">Save Results</button>
           </div>
         </form>
@@ -115,24 +126,25 @@
 {% block custom_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const sessionDropdown = document.getElementById('session');
-    const termDropdown = document.getElementById('term');
-    const studentDropdown = document.getElementById('student');
-
-    // Function to fetch terms when session is selected
-    sessionDropdown.addEventListener('change', function() {
-        const sessionId = this.value;
+    // Fetch terms when a session is selected
+    document.getElementById('session').addEventListener('change', function() {
+        var sessionId = this.value;
+        var termDropdown = document.getElementById('term');
         termDropdown.innerHTML = '<option value="">-- Select Term --</option>';
+
         if (sessionId) {
             fetch("{% url 'get_terms' %}", {
                 method: 'POST',
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/x-www-form-urlencoded" },
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
                 body: "session=" + sessionId
             })
             .then(response => response.json())
             .then(data => {
-                data.forEach(term => {
-                    const option = document.createElement("option");
+                data.forEach(function(term) {
+                    var option = document.createElement("option");
                     option.value = term.id;
                     option.text = term.name + " Term";
                     termDropdown.appendChild(option);
@@ -142,40 +154,110 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Function to fetch additional student details
-    studentDropdown.addEventListener('change', function() {
-        const studentId = this.value;
-        const sessionId = sessionDropdown.value;
-        const termId = termDropdown.value;
+      // Fetch attendance when student, session, and term are selected
+      document.getElementById("term").addEventListener("change", function () {
+        let studentId = document.getElementById("student").value;
+        let sessionId = document.getElementById("session").value;
+        let termId = this.value;
+    
+        if (!studentId || !sessionId || !termId) {
+            console.error("Missing required data:", { studentId, sessionId, termId });
+            return;
+        }
+    
+        fetch("{% url 'staff_views_get_attendance' %}", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: `student_id=${studentId}&session_id=${sessionId}&term_id=${termId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Attendance Data Received:", data);
+            if (data.success) {
+                document.getElementById("attendance").value = data.attendance_count;
+            } else {
+                console.error("Error fetching attendance:", data.error);
+            }
+        })
+        .catch(error => console.error("Fetch error:", error));
+    });
+    
+  
 
-        if (studentId && sessionId && termId) {
-            fetch("", {
-                method: 'POST',
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/x-www-form-urlencoded" },
-                body: `student=${studentId}&session=${sessionId}&term=${termId}`
+    // Auto-calculate days in term
+    function calculateDays() {
+        let startDate = document.getElementById("beginning_of_term").value;
+        let endDate = document.getElementById("end_of_term").value;
+
+        if (startDate && endDate) {
+            fetch("{% url 'calculate_days_in_term' %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: `start_date=${startDate}&end_date=${endDate}`
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('resumptionDate').textContent = data.resumption_date || 'N/A';
-                document.getElementById('daysInTerm').textContent = data.days_in_term || 'N/A';
-                document.getElementById('attendance').textContent = data.attendance || 'N/A';
-                document.getElementById('noInClass').textContent = data.no_in_class || 'N/A';
+                if (data.success) {
+                    document.getElementById("days_in_term").value = data.days_in_term;
+                }
             })
-            .catch(error => console.error('Error fetching student details:', error));
+            .catch(error => console.error("Error calculating days:", error));
         }
-    });
+    }
 
-    // Auto-calculate total scores
-    document.querySelectorAll('.subject-row').forEach(row => {
-        row.querySelectorAll('input[type="number"]').forEach(input => {
-            input.addEventListener('input', () => {
-                const ca1 = parseFloat(row.querySelector('.ca1').value) || 0;
-                const ca2 = parseFloat(row.querySelector('.ca2').value) || 0;
-                const exam = parseFloat(row.querySelector('.exam').value) || 0;
-                row.querySelector('.total').value = (ca1 + ca2 + exam).toFixed(2);
-            });
-        });
-    });
+    document.getElementById("beginning_of_term").addEventListener("change", calculateDays);
+    document.getElementById("end_of_term").addEventListener("change", calculateDays);
 });
+
+
+  // Attach event listeners to input fields for auto-calculating total scores
+  document.querySelectorAll('.ca1, .ca2, .exam').forEach(input => {
+      input.addEventListener('input', function() {
+          var row = this.closest('tr');
+          calculateTotal(row);
+      });
+  });
+
+  // Function to calculate the total score for each row
+  function calculateTotal(row) {
+      var ca1 = parseFloat(row.querySelector('.ca1').value) || 0;
+      var ca2 = parseFloat(row.querySelector('.ca2').value) || 0;
+      var exam = parseFloat(row.querySelector('.exam').value) || 0;
+
+      // Ensure scores do not exceed their max values
+      if (ca1 > 30) {
+          row.querySelector('.ca1').value = 30;
+          ca1 = 30;
+      }
+      if (ca2 > 10) {
+          row.querySelector('.ca2').value = 10;
+          ca2 = 10;
+      }
+      if (exam > 60) {
+          row.querySelector('.exam').value = 60;
+          exam = 60;
+      }
+
+      var total = ca1 + ca2 + exam;
+      row.querySelector('.total-score').value = total.toFixed(2);
+  }
+
+  // Validate form before submission
+  document.getElementById('resultForm').addEventListener('submit', function(e) {
+      let isValid = true;
+      document.querySelectorAll('.total-score').forEach(input => {
+          if (parseFloat(input.value) > 100) {
+              isValid = false;
+              alert('Total score cannot exceed 100.');
+          }
+      });
+      if (!isValid) e.preventDefault();
+  });
 </script>
 {% endblock custom_js %}

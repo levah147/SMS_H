@@ -1,0 +1,108 @@
+{% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}Overall Session Results{% endblock page_title %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Page Header -->
+    <h2 class="mb-4">Overall Results for {{ session.start_year }} - {{ session.end_year }}</h2>
+
+    <!-- Student Information Card -->
+    <div class="card shadow-lg p-4 mb-5 bg-white rounded">
+        <div class="row">
+            <div class="col-md-6">
+                <strong>Student Name:</strong> {{ student.admin.first_name }} {{ student.admin.last_name }}<br>
+                <strong>Program:</strong> {{ student.program.name }}<br>
+                <strong>Session:</strong> {{ session.start_year }} - {{ session.end_year }}
+            </div>
+            <div class="col-md-6 text-right">
+                {% if student.admin.profile_pic %}
+                    <img src="{{ student.admin.profile_pic.url }}" alt="Profile Picture" class="rounded-circle" width="100">
+                {% else %}
+                    <img src="{% static 'dist/img/avatar5.png' %}" alt="Default Student Image" class="rounded-circle" width="100">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Term-by-Term Results -->
+    {% for term, summary in term_results.items %}
+    <div class="card shadow-sm p-3 mb-4">
+        <!-- Term Header -->
+        <h4 class="text-center">{{ term.name }} Term</h4>
+        
+        <!-- Term Results Table -->
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Subject</th>
+                    <th>CAT 1 (30)</th>
+                    <th>CAT 2 (10)</th>
+                    <th>Exam (60)</th>
+                    <th>Total (100)</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in summary.results %}
+                <tr>
+                    <td>{{ result.subject.name }}</td>
+                    <td>{{ result.ca_test1 }}</td>
+                    <td>{{ result.ca_test2 }}</td>
+                    <td>{{ result.exam_score }}</td>
+                    <td>{{ result.total_score }}</td>
+                    <td>{{ result.grade }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No results available.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Term Summary Statistics -->
+        <div class="p-3 bg-light">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Term Total Score:</strong> {{ summary.total_score }}</p>
+                    <p><strong>Term Average:</strong> {{ summary.average_score|default:"N/A" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Term Grade:</strong> {{ summary.grade|default:"N/A" }}</p>
+                    <p><strong>Position:</strong> {{ summary.position|default:"N/A" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Overall Session Summary -->
+    <div class="card p-4 bg-light mb-4">
+        <h4 class="text-center mb-3">Overall Session Summary</h4>
+        <div class="row text-center">
+            <div class="col-md-4">
+                <p><strong>Grand Total Score:</strong><br> {{ total_score }}</p>
+            </div>
+            <div class="col-md-4">
+                <p><strong>Final Average:</strong><br> {{ average_score|floatformat:"2" }}</p>
+            </div>
+            <div class="col-md-4">
+                <p><strong>Final Grade:</strong><br> {{ final_grade }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4 mb-5">
+        <a href="{% url 'student_results_list' %}" class="btn btn-secondary mr-2">
+            <i class="fas fa-arrow-left"></i> Back to Results
+        </a>
+        <a href="{% url 'student_overall_result_pdf' session.id %}" target="_blank" class="btn btn-success">
+            <i class="fas fa-print"></i> Print PDF
+        </a>
+    </div>
+</div>
+{% endblock content %}
+

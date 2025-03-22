@@ -35,12 +35,14 @@
                                     <td>{{student.gender}}</td>
                                     <td>{{student.student.program.name}}</td>
                                     <td>
-                                        {% if student.profile_pic == ""  %}
-                                        No Image
-                                        {% else %}
-                                        <img class="img img-fluid mb-2" height="100" width="100"
-                                            src="{{student.profile_pic}}" alt="">
-                                        {% endif %}
+                                        {% if student.profile_pic %}
+    <img class="img img-fluid mb-2" height="100" width="100"
+         src="{{ student.profile_pic.url }}" alt="Student Image">
+{% else %}
+    <img class="img img-fluid mb-2" height="100" width="100"
+         src="{% static 'dist/img/avatar5.png' %}" alt="Default Image">
+{% endif %}
+
                                     </td>
                                     
                                     <td><a href="{% url 'edit_student' student.student.id %}" class="btn btn-primary">Edit</a> -

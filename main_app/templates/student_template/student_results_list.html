@@ -1,53 +1,95 @@
 {% extends 'main_app/base.html' %}
 {% load static %}
 
-{% block page_title %}{{ page_title }}{% endblock page_title %}
+{% block page_title %}My Results{% endblock page_title %}
 
 {% block content %}
 <div class="container mt-5">
-  <h2 class="mb-4">Results List</h2>
-  <!-- Filtering Form -->
-  <form method="GET" class="mb-4" action="{% url 'student_result_detail_filtered' %}">
-    <div class="row">
-      <div class="col-md-6">
-        <label for="session">Select Academic Session</label>
-        <select name="session" id="session" class="form-control">
-          <option value="">-- All Sessions --</option>
-          {% for session in sessions %}
-            <option value="{{ session.id }}" {% if session.id|stringformat:"s" == selected_session_id %}selected{% endif %}>
-              {{ session.start_year }} - {{ session.end_year }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-6">
-        <label for="term">Select Term</label>
-        <select name="term" id="term" class="form-control">
-          <option value="">-- All Terms --</option>
-          {# Only display terms that belong to the selected session if one is chosen #}
-          {% if selected_session_id %}
-            {% for term in terms %}
-              {% if term.session.id|stringformat:"s" == selected_session_id %}
-                <option value="{{ term.id }}" {% if term.id|stringformat:"s" == selected_term_id %}selected{% endif %}>
-                  {{ term.name }} Term
-                </option>
-              {% endif %}
-            {% endfor %}
-          {% else %}
-            {# Otherwise, list all terms #}
-            {% for term in terms %}
-              <option value="{{ term.id }}" {% if term.id|stringformat:"s" == selected_term_id %}selected{% endif %}>
-                {{ term.name }} Term ({{ term.session.start_year }}-{{ term.session.end_year }})
-              </option>
-            {% endfor %}
-          {% endif %}
-        </select>
-      </div>
-    </div>
-    <button type="submit" class="btn btn-primary mt-3">Filter Results</button>
-  </form>
+    <h2 class="mb-4">Filter Results</h2>
 
- 
+    <!-- Filtering Form -->
+    <form method="GET" class="mb-4 shadow-sm p-4 bg-white rounded" action="{% url 'student_result_detail_filtered' %}">
+        <div class="row">
+            <div class="col-md-6">
+                <label for="session">Select Academic Session</label>
+                <select name="session" id="session" class="form-control">
+                    <option value="">-- Select Session --</option>
+                    {% for session in sessions %}
+                        <option value="{{ session.id }}">{{ session.start_year }} - {{ session.end_year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="term">Select Term</label>
+                <select name="term" id="term" class="form-control">
+                    <option value="">-- Select Term --</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Filter Results</button>
+    </form>
+
+    <h2 class="mt-5">Overall Results by Session</h2>
+    <table class="table table-bordered shadow-sm bg-white">
+        <thead class="thead-dark">
+            <tr>
+                <th>Program</th>
+                <th>Session</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in sessions %}
+            <tr>
+                <td>{{ student.program.name }}</td>
+                <td>{{ session.start_year }} - {{ session.end_year }}</td>
+                <td>
+                    <a href="{% url 'student_overall_result' session.id %}" class="btn btn-info btn-sm">View Overall Results</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" class="text-center">No sessions available.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock content %}
 
+{% block custom_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var sessionDropdown = document.getElementById("session");
+    var termDropdown = document.getElementById("term");
+
+    sessionDropdown.addEventListener("change", function() {
+        var sessionId = this.value;
+        termDropdown.innerHTML = '<option value="">-- Select Term --</option>'; 
+
+        if (sessionId) {
+            fetch("{% url 'get_terms_student' %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",  
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({ "session": sessionId }) 
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    data.forEach(function(term) {
+                        var option = document.createElement("option");
+                        option.value = term.id;
+                        option.text = term.name + " Term";
+                        termDropdown.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error("Error fetching terms:", error));
+        }
+    });
+});
+</script>
+{% endblock custom_js %}

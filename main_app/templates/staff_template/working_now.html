@@ -1,6 +1,280 @@
+{% comment %} 
 
 
 
+
+# @csrf_exempt
+# def get_terms(request):
+#     session_id = request.POST.get('session')
+#     if session_id:
+#         terms = Term.objects.filter(session_id=session_id)  # Filter terms by session
+#         data = [{'id': term.id, 'name': term.name} for term in terms]
+#         return JsonResponse(data, safe=False)
+#     return JsonResponse([], safe=False)
+
+# from django.http import JsonResponse
+# from django.views.decorators.csrf import csrf_exempt
+# from .models import Term
+
+# @csrf_exempt
+# def get_terms(request):
+#     """Fetch terms only for the selected session."""
+#     if request.method == "POST":
+#         session_id = request.POST.get("session")  # Get session ID from AJAX request
+#         if session_id:
+#             terms = Term.objects.filter(session_id=session_id).values("id", "name")
+#             return JsonResponse(list(terms), safe=False)
+    
+#     return JsonResponse([], safe=False)  # Return empty list if no session selected
+
+# from django.http import JsonResponse
+# from django.views.decorators.csrf import csrf_exempt
+# from .models import Term
+
+# @csrf_exempt
+# def get_terms(request):
+#     """Fetch terms only for the selected session."""
+#     if request.method == "POST":
+#         session_id = request.POST.get("session")
+#         print("Session ID received:", session_id)  # Debugging
+#         if session_id:
+#             terms = Term.objects.filter(session_id=session_id).values("id", "name")
+#             print("Terms found:", list(terms))  # Debugging
+#             return JsonResponse(list(terms), safe=False)
+    
+#     return JsonResponse([], safe=False)  # Return empty list if no session selected
+
+
+
+
+
+{% comment %} {% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-4">Results List</h2>
+  
+  <!-- Filtering Form -->
+  <form method="GET" class="mb-4" action="{% url 'student_result_detail_filtered' %}">
+    <div class="row">
+      <div class="col-md-6">
+        <label for="session">Select Academic Session</label>
+        <select name="session" id="session" class="form-control">
+          <option value="">-- Select Session --</option>
+          {% for session in sessions %}
+            <option value="{{ session.id }}" {% if session.id|stringformat:"s" == selected_session_id %}selected{% endif %}>
+              {{ session.start_year }} - {{ session.end_year }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label for="term">Select Term</label>
+        <select name="term" id="term" class="form-control">
+          <option value="">-- Select Term --</option>
+        </select>
+      </div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary mt-3">Filter Results</button>
+  </form>
+</div>
+
+{% endblock content %}
+
+{% block custom_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+      var sessionDropdown = document.getElementById("session");
+      var termDropdown = document.getElementById("term");
+  
+      sessionDropdown.addEventListener("change", function() {
+          var sessionId = this.value;
+          termDropdown.innerHTML = '<option value="">-- Select Term --</option>'; // Clear previous terms
+  
+          if (sessionId) {
+              fetch("{% url 'get_terms' %}", {
+                  method: "POST",
+                  headers: {
+                      "X-CSRFToken": "{{ csrf_token }}",  // Ensure CSRF token is passed
+                      "Content-Type": "application/x-www-form-urlencoded"
+                  },
+                  body: new URLSearchParams({ "session": sessionId }) // Encode as form data
+              })
+              .then(response => response.json())
+              .then(data => {
+                  console.log("Terms received:", data);  // Debugging
+                  if (data.length > 0) {
+                      data.forEach(function(term) {
+                          var option = document.createElement("option");
+                          option.value = term.id;
+                          option.text = term.name + " Term";
+                          termDropdown.appendChild(option);
+                      });
+                  }
+              })
+              .catch(error => console.error("Error fetching terms:", error));
+          }
+      });
+  
+      // Preserve selected term if page is reloaded
+      var selectedSessionId = "{{ selected_session_id }}";
+      var selectedTermId = "{{ selected_term_id }}";
+  
+      if (selectedSessionId) {
+          sessionDropdown.value = selectedSessionId;
+          sessionDropdown.dispatchEvent(new Event("change")); // Trigger term fetch
+  
+          setTimeout(() => {
+              if (selectedTermId) {
+                  termDropdown.value = selectedTermId;
+              }
+          }, 1000);
+      }
+  });
+  </script>
+  
+{% endblock custom_js %} {% endcomment %}
+
+
+ 
+
+
+ 
+{% comment %} ////////////////////////////////////////////////////////////////////////////////////////////////////// {% endcomment %}
+
+
+{% comment %} {% extends 'main_app/base.html' %}
+{% load static %}
+
+{% block page_title %}{{ page_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card">
+      <div class="card-header text-center">
+        <h3 class="card-title mb-0">View My Results</h3>
+      </div>
+      <div class="card-body">
+        
+        <!-- Filter Form -->
+        <form method="GET" id="filterForm">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="session">Select Academic Session</label>
+              <select name="session" id="session" class="form-control" required>
+                <option value="">-- Select Session --</option>
+                {% for session in sessions %}
+                  <option value="{{ session.id }}" {% if session.id|stringformat:'s' == selected_session_id %}selected{% endif %}>
+                    {{ session.start_year }} - {{ session.end_year }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="term">Select Term</label>
+              <select name="term" id="term" class="form-control" required>
+                <option value="">-- Select Term --</option>
+              </select>
+            </div>
+          </div>
+        </form>
+
+        <!-- Results Table -->
+        <div id="resultsContainer">
+          {% if results %}
+          <div class="table-responsive">
+            <table class="table table-bordered">
+              <thead class="thead-light">
+                <tr>
+                  <th>Subject</th>
+                  <th>CAT1 (30 Marks)</th>
+                  <th>CAT2 (10 Marks)</th>
+                  <th>EXAM (60 Marks)</th>
+                  <th>TOTAL</th>
+                  <th>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for result in results %}
+                <tr>
+                  <td>{{ result.subject.name }}</td>
+                  <td>{{ result.ca_test1 }}</td>
+                  <td>{{ result.ca_test2 }}</td>
+                  <td>{{ result.exam_score }}</td>
+                  <td>{{ result.total_score }}</td>
+                  <td>{{ result.grade }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p class="text-center text-muted">No results found. Please select a session and term.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block custom_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let sessionDropdown = document.getElementById('session');
+    let termDropdown = document.getElementById('term');
+    let filterForm = document.getElementById('filterForm');
+
+    // Function to fetch terms for the selected session
+    function fetchTerms(sessionId) {
+        termDropdown.innerHTML = '<option value="">-- Select Term --</option>';
+        if (sessionId) {
+            fetch("{% url 'get_terms' %}", {
+                method: 'POST',
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: "session=" + sessionId
+            })
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(term => {
+                    let option = document.createElement("option");
+                    option.value = term.id;
+                    option.text = term.name + " Term";
+                    termDropdown.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
+
+    // Auto-fetch terms when session is selected
+    sessionDropdown.addEventListener('change', function() {
+        fetchTerms(this.value);
+    });
+
+    // Auto-submit when both session and term are selected
+    termDropdown.addEventListener('change', function() {
+        if (sessionDropdown.value && termDropdown.value) {
+            filterForm.submit();
+        }
+    });
+
+    // Load terms if session is preselected
+    {% if selected_session_id %}
+        fetchTerms("{{ selected_session_id }}");
+    {% endif %}
+});
+</script>
+{% endblock custom_js %} {% endcomment %}
 
 
 
@@ -209,4 +483,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock custom_js %}
+{% endblock custom_js %} {% endcomment %}

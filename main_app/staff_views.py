@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import requests
@@ -10,6 +11,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.template.loader import get_template
 from django.templatetags.static import static
 from django.views import View
+from django.utils import timezone
+from datetime import datetime
+
+
 
 from .forms import *  # Ensure your forms include TermResultForm (with a 'term' field)
 from .models import *  # This imports CustomUser, Staff, Student, Program, Subject, Attendance, AttendanceReport, LeaveReportStaff, FeedbackStaff, NotificationStaff, Result, ResultSummary, Term, etc.
@@ -18,6 +23,31 @@ from .models import *  # This imports CustomUser, Staff, Student, Program, Subje
 # Dashboard and General Views
 # ------------------------------
 
+# def staff_home(request):
+#     staff = get_object_or_404(Staff, admin=request.user)
+#     total_students = Student.objects.filter(program=staff.program).count()
+#     total_leave = LeaveReportStaff.objects.filter(staff=staff).count()
+#     subjects = Subject.objects.filter(staff=staff)
+#     total_subject = subjects.count()
+    
+#     # Build attendance data for each subject.
+#     attendance_list = []
+#     subject_list = []
+#     for subject in subjects:
+#         attendance_count = Attendance.objects.filter(subject=subject).count()
+#         subject_list.append(subject.name)
+#         attendance_list.append(attendance_count)
+    
+#     context = {
+#         'page_title': f'Staff Panel - {staff.admin.last_name} ({staff.program})',
+#         'total_students': total_students,
+#         'total_attendance': sum(attendance_list),
+#         'total_leave': total_leave,
+#         'total_subject': total_subject,
+#         'subject_list': subject_list,
+#         'attendance_list': attendance_list,
+#     }
+#     return render(request, 'staff_template/home_content.html', context)
 def staff_home(request):
     staff = get_object_or_404(Staff, admin=request.user)
     total_students = Student.objects.filter(program=staff.program).count()
@@ -25,12 +55,13 @@ def staff_home(request):
     subjects = Subject.objects.filter(staff=staff)
     total_subject = subjects.count()
     
-    # Build attendance data for each subject.
+    # Attendance should now be counted per student, not subject
     attendance_list = []
     subject_list = []
-    for subject in subjects:
-        attendance_count = Attendance.objects.filter(subject=subject).count()
-        subject_list.append(subject.name)
+    
+    for student in Student.objects.filter(program=staff.program):
+        attendance_count = Attendance.objects.filter(student=student).count()
+        subject_list.append(f"{student.admin.first_name} {student.admin.last_name}")
         attendance_list.append(attendance_count)
     
     context = {
@@ -196,20 +227,6 @@ def ajax_staff_notifications3(request):
     data = [{'id': n.id, 'message': n.message} for n in notifications]
     return JsonResponse(data, safe=False)
 
-
-# @csrf_exempt
-# def ajax_get_notifications(request):
-#     # Example for staff notifications; adjust for student if needed.
-#     staff = get_object_or_404(Staff, admin=request.user)
-#     notifications = NotificationStaff.objects.filter(staff=staff, is_read=False)
-#     data = [{'id': n.id, 'message': n.message} for n in notifications]
-#     return JsonResponse(data, safe=False)
-
-# @csrf_exempt
-# def ajax_mark_notifications_read(request):
-#     staff = get_object_or_404(Staff, admin=request.user)
-#     NotificationStaff.objects.filter(staff=staff, is_read=False).update(is_read=True)
-#     return JsonResponse({'status': 'success'})
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import NotificationStaff
@@ -244,9 +261,6 @@ def ajax_mark_notifications_read_staff(request):
     NotificationStaff.objects.filter(staff=staff, is_read=False).update(is_read=True)
     return JsonResponse({'status': 'success'})
 
-
-
-
 def staff_feedback(request):
     form = FeedbackStaffForm(request.POST or None)
     staff = get_object_or_404(Staff, admin_id=request.user.id)
@@ -269,7 +283,6 @@ def staff_feedback(request):
             messages.error(request, "Form has errors!")
     return render(request, "staff_template/staff_feedback.html", context)
 
-
 def staff_view_profile(request):
     staff = get_object_or_404(Staff, admin=request.user)
     form = StaffEditForm(request.POST or None, request.FILES or None, instance=staff)
@@ -290,7 +303,9 @@ def staff_view_profile(request):
                     fs = FileSystemStorage()
                     filename = fs.save(os.path.basename(passport.name), passport)
                     passport_url = fs.url(filename)
-                    admin.profile_pic = passport_url
+                    admin.profile_pic = filename  # Save the relative path
+                    
+                    # admin.profile_pic = passport_url
                 admin.first_name = first_name
                 admin.last_name = last_name
                 admin.address = address
@@ -307,7 +322,6 @@ def staff_view_profile(request):
             return render(request, "staff_template/staff_view_profile.html", context)
     return render(request, "staff_template/staff_view_profile.html", context)
 
-
 @csrf_exempt
 def staff_fcmtoken(request):
     token = request.POST.get('token')
@@ -319,59 +333,63 @@ def staff_fcmtoken(request):
     except Exception as e:
         return HttpResponse("False")
 
-
-
 # ------------------------------
 # Staff Result Views
 # ------------------------------
 
-# @csrf_exempt
 # def staff_add_result(request):
-#     staff = get_object_or_404(Staff, admin=request.user)
+#     """Handles staff adding student results, including attendance & resumption date."""
+#     staff = request.user.staff  
 #     subjects = Subject.objects.filter(staff=staff)
-#     # Filter students by the staff's program.
 #     students = Student.objects.filter(program=staff.program)
-#     # Get all academic sessions and terms.
 #     sessions = Session.objects.all()
 #     terms = Term.objects.all()
-#     page_title = "Add Results"
-    
-#     context = {
-#         'students': students,
-#         'subjects': subjects,
-#         'sessions': sessions,
-#         'terms': terms,
-#         'page_title': page_title,
-#     }
-    
+
 #     if request.method == 'POST':
 #         try:
 #             student_id = request.POST.get('student')
 #             session_id = request.POST.get('session')
 #             term_id = request.POST.get('term')
-#             if not student_id:
-#                 messages.error(request, "Please select a student.")
-#                 return render(request, "staff_template/staff_add_result.html", context)
-#             if not session_id:
-#                 messages.error(request, "Please select an academic session.")
-#                 return render(request, "staff_template/staff_add_result.html", context)
-#             if not term_id:
-#                 messages.error(request, "Please select a term.")
-#                 return render(request, "staff_template/staff_add_result.html", context)
-            
+#             resumption_date = request.POST.get('resumption_date')
+#             days_in_term = request.POST.get('days_in_term')
+#             attendance = request.POST.get('attendance')
+#             teacher_remarks = request.POST.get('teacher_remarks', '')
+
+#             # Validate inputs
+#             if not student_id or not session_id or not term_id:
+#                 messages.error(request, "Please select a student, session, and term.")
+#                 return redirect('staff_add_result')
+
 #             student = get_object_or_404(Student, id=student_id)
 #             session = get_object_or_404(Session, id=session_id)
-#             term = get_object_or_404(Term, id=term_id)
-#             # Validate that the term belongs to the selected session.
-#             if term.session.id != session.id:
-#                 messages.error(request, "Selected term does not belong to the chosen session.")
-#                 return render(request, "staff_template/staff_add_result.html", context)
-            
-#             # Loop through each subject and update or create the result.
+#             term = get_object_or_404(Term, id=term_id, session=session)
+
+#             # 🔹 Check if a ResultSummary already exists for this student & term
+#             summary, created = ResultSummary.objects.get_or_create(
+#                 student=student,
+#                 term=term,
+#                 defaults={
+#                     'resumption_date': resumption_date,
+#                     'days_in_term': days_in_term,
+#                     'attendance': attendance,
+#                     'teacher_remarks': teacher_remarks
+#                 }
+#             )
+
+#             if not created:  # 🔹 If already exists, update instead of creating duplicate
+#                 summary.resumption_date = resumption_date
+#                 summary.days_in_term = days_in_term
+#                 summary.attendance = attendance
+#                 summary.teacher_remarks = teacher_remarks
+#                 summary.save()
+
+#             # 🔹 Save results for each subject
 #             for subject in subjects:
 #                 ca_test1 = float(request.POST.get(f'ca_test1_{subject.id}', 0))
 #                 ca_test2 = float(request.POST.get(f'ca_test2_{subject.id}', 0))
 #                 exam_score = float(request.POST.get(f'exam_{subject.id}', 0))
+#                 total_score = ca_test1 + ca_test2 + exam_score
+
 #                 Result.objects.update_or_create(
 #                     student=student,
 #                     subject=subject,
@@ -380,94 +398,279 @@ def staff_fcmtoken(request):
 #                         'ca_test1': ca_test1,
 #                         'ca_test2': ca_test2,
 #                         'exam_score': exam_score,
+#                         'total_score': total_score
 #                     }
 #                 )
-#             teacher_remarks = request.POST.get('teacher_remarks', '')
-#             summary, created = ResultSummary.objects.get_or_create(
-#                 student=student,
-#                 defaults={
-#                     'total_score': 0,
-#                     'average_score': 0,
-#                     'position': 0,
-#                     'grade': 'F',
-#                     'teacher_remarks': teacher_remarks
-#                 }
-#             )
-#             if not created:
-#                 summary.teacher_remarks = teacher_remarks
-#                 summary.save()
-#             messages.success(request, "Scores saved successfully!")
-#             return redirect(reverse('staff_result_detail', kwargs={'student_id': student.id}))
+
+#             messages.success(request, "Results saved successfully!")
+#             return redirect('staff_add_result')
+
 #         except Exception as e:
-#             messages.error(request, "Error Occurred While Processing Form: " + str(e))
-    
+#             messages.error(request, f"Error occurred while saving results: {e}")
+
+#     context = {
+#         'students': students,
+#         'sessions': sessions,
+#         'terms': terms,
+#         'subjects': subjects,
+#         'page_title': 'Add Student Results',
+#     }
 #     return render(request, "staff_template/staff_add_result.html", context)
+
 @csrf_exempt
-def staff_add_result(request):
-    staff = get_object_or_404(Staff, admin=request.user)
-    subjects = Subject.objects.filter(staff=staff)
-    students = Student.objects.filter(program=staff.program)
-    sessions = Session.objects.all()
-    terms = Term.objects.all()
-    page_title = "Add Results"
+def staff_views_get_attendance(request):
+    """Returns total attendance count for a student in a session & term."""
+    if request.method == "POST":
+        student_id = request.POST.get("student_id")
+        session_id = request.POST.get("session_id")
+        term_id = request.POST.get("term_id")
 
-    if request.method == 'POST':
-        student_id = request.POST.get('student')
-        session_id = request.POST.get('session')
-        term_id = request.POST.get('term')
-        teacher_remarks = request.POST.get('teacher_remarks', '')
-
+        # 🔴 If any required field is missing, return an error
         if not student_id or not session_id or not term_id:
-            messages.error(request, "Please select a student, session, and term.")
-            return redirect('staff_add_result')
+            return JsonResponse({"success": False, "error": "Missing required data"}, status=400)
 
         student = get_object_or_404(Student, id=student_id)
         session = get_object_or_404(Session, id=session_id)
         term = get_object_or_404(Term, id=term_id, session=session)
 
-        for subject in subjects:
-            ca_test1 = float(request.POST.get(f'ca_test1_{subject.id}', 0))
-            ca_test2 = float(request.POST.get(f'ca_test2_{subject.id}', 0))
-            exam_score = float(request.POST.get(f'exam_{subject.id}', 0))
+        attendance_count = Attendance.objects.filter(
+            student=student, session=session, term=term, is_present=True
+        ).count()
 
-            Result.objects.update_or_create(
+        return JsonResponse({"success": True, "attendance_count": attendance_count})
+
+    return JsonResponse({"success": False, "error": "Invalid request method"}, status=400)
+
+
+
+@csrf_exempt
+def calculate_days_in_term(request):
+    """Calculates the number of days between the beginning and end of term."""
+    if request.method == "POST":
+        start_date = request.POST.get("start_date")
+        end_date = request.POST.get("end_date")
+
+        if not start_date or not end_date:
+            return JsonResponse({"success": False, "error": "Missing required dates"}, status=400)
+
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+            if end_date < start_date:
+                return JsonResponse({"success": False, "error": "End date cannot be before start date"}, status=400)
+
+            days_in_term = (end_date - start_date).days
+            return JsonResponse({"success": True, "days_in_term": days_in_term})
+
+        except ValueError:
+            return JsonResponse({"success": False, "error": "Invalid date format"}, status=400)
+
+    return JsonResponse({"success": False, "error": "Invalid request method"}, status=400)
+
+
+# def staff_add_result(request):
+#     """Handles staff adding student results, including attendance & term dates."""
+#     staff = request.user.staff
+#     subjects = Subject.objects.filter(staff=staff)
+#     students = Student.objects.filter(program=staff.program)
+#     sessions = Session.objects.all()
+#     terms = Term.objects.all()
+
+#     if request.method == 'POST':
+#         try:
+#             student_id = request.POST.get('student')
+#             session_id = request.POST.get('session')
+#             term_id = request.POST.get('term')
+#             beginning_of_term = request.POST.get('beginning_of_term')
+#             end_of_term = request.POST.get('end_of_term')
+#             resumption_date = request.POST.get('resumption_date')
+#             days_in_term = request.POST.get('days_in_term')
+#             attendance = request.POST.get('attendance')
+#             teacher_remarks = request.POST.get('teacher_remarks', '')
+
+#             # Validate inputs
+#             if not student_id or not session_id or not term_id:
+#                 messages.error(request, "Please select a student, session, and term.")
+#                 return redirect('staff_add_result')
+
+#             student = get_object_or_404(Student, id=student_id)
+#             session = get_object_or_404(Session, id=session_id)
+#             term = get_object_or_404(Term, id=term_id, session=session)
+
+#             # Update Term with the new dates
+#             term.beginning_of_term = beginning_of_term
+#             term.end_of_term = end_of_term
+#             term.days_in_term = days_in_term
+#             term.save()
+
+#             # 🔹 Check if a ResultSummary already exists for this student & term
+#             summary, created = ResultSummary.objects.get_or_create(
+#                 student=student,
+#                 term=term,
+#                 defaults={
+#                     'resumption_date': resumption_date,
+#                     'days_in_term': days_in_term,
+#                     'attendance': attendance,
+#                     'teacher_remarks': teacher_remarks
+#                 }
+#             )
+
+#             if not created:  # 🔹 If already exists, update instead of creating duplicate
+#                 summary.resumption_date = resumption_date
+#                 summary.days_in_term = days_in_term
+#                 summary.attendance = attendance
+#                 summary.teacher_remarks = teacher_remarks
+#                 summary.save()
+
+#             # 🔹 Save results for each subject
+#             for subject in subjects:
+#                 ca_test1 = float(request.POST.get(f'ca_test1_{subject.id}', 0))
+#                 ca_test2 = float(request.POST.get(f'ca_test2_{subject.id}', 0))
+#                 exam_score = float(request.POST.get(f'exam_{subject.id}', 0))
+#                 total_score = ca_test1 + ca_test2 + exam_score
+
+#                 Result.objects.update_or_create(
+#                     student=student,
+#                     subject=subject,
+#                     term=term,
+#                     defaults={
+#                         'ca_test1': ca_test1,
+#                         'ca_test2': ca_test2,
+#                         'exam_score': exam_score,
+#                         'total_score': total_score
+#                     }
+#                 )
+
+#             messages.success(request, "Results saved successfully!")
+#             return redirect('staff_add_result')
+
+#         except Exception as e:
+#             messages.error(request, f"Error occurred while saving results: {e}")
+
+#     context = {
+#         'students': students,
+#         'sessions': sessions,
+#         'terms': terms,
+#         'subjects': subjects,
+#         'page_title': 'Add Student Results',
+#     }
+#     return render(request, "staff_template/staff_add_result.html", context)
+from datetime import datetime
+
+def staff_add_result(request):
+    """Handles staff adding student results, including attendance & term dates."""
+    staff = request.user.staff
+    subjects = Subject.objects.filter(staff=staff)
+    students = Student.objects.filter(program=staff.program)
+    sessions = Session.objects.all()
+    terms = Term.objects.all()
+
+    if request.method == 'POST':
+        try:
+            # Fetching data from the form
+            student_id = request.POST.get('student')
+            session_id = request.POST.get('session')
+            term_id = request.POST.get('term')
+            beginning_of_term = request.POST.get('beginning_of_term')
+            end_of_term = request.POST.get('end_of_term')
+            resumption_date = request.POST.get('resumption_date')
+            days_in_term = request.POST.get('days_in_term')
+            attendance = request.POST.get('attendance')
+            teacher_remarks = request.POST.get('teacher_remarks', '').strip()
+
+            # ✅ Validate mandatory fields
+            if not student_id or not session_id or not term_id:
+                messages.error(request, "Please select a student, session, and term.")
+                return redirect('staff_add_result')
+            
+            # ✅ Validate dates
+            if not beginning_of_term or not end_of_term or not resumption_date:
+                messages.error(request, "Please provide all required dates.")
+                return redirect('staff_add_result')
+
+            # ✅ Validate days and attendance (Convert to integer)
+            try:
+                days_in_term = int(days_in_term)
+                attendance = int(attendance)
+            except ValueError:
+                messages.error(request, "Days in term and attendance must be valid numbers.")
+                return redirect('staff_add_result')
+
+            # ✅ Get the required objects
+            student = get_object_or_404(Student, id=student_id)
+            session = get_object_or_404(Session, id=session_id)
+            term = get_object_or_404(Term, id=term_id, session=session)
+
+            # ✅ Update Term with the new dates
+            term.beginning_of_term = beginning_of_term
+            term.end_of_term = end_of_term
+            term.days_in_term = days_in_term
+            term.save()
+
+            # ✅ Check if a ResultSummary already exists
+            summary, created = ResultSummary.objects.get_or_create(
                 student=student,
-                subject=subject,
                 term=term,
                 defaults={
-                    'ca_test1': ca_test1,
-                    'ca_test2': ca_test2,
-                    'exam_score': exam_score,
+                    'resumption_date': resumption_date,
+                    'days_in_term': days_in_term,
+                    'attendance': attendance,
+                    'teacher_remarks': teacher_remarks
                 }
             )
 
-        summary, created = ResultSummary.objects.get_or_create(
-            student=student,
-            term=term,
-            defaults={
-                'total_score': 0,
-                'average_score': 0,
-                'position': 0,
-                'grade': 'F',
-                'teacher_remarks': teacher_remarks
-            }
-        )
+            # ✅ If already exists, update instead of creating duplicate
+            if not created:
+                summary.resumption_date = resumption_date
+                summary.days_in_term = days_in_term
+                summary.attendance = attendance
+                summary.teacher_remarks = teacher_remarks
+                summary.save()
 
-        if not created:
-            summary.teacher_remarks = teacher_remarks
-            summary.save()
+            # ✅ Save results for each subject
+            for subject in subjects:
+                # Fetch scores, default to 0 if empty
+                ca_test1 = float(request.POST.get(f'ca_test1_{subject.id}', 0) or 0)
+                ca_test2 = float(request.POST.get(f'ca_test2_{subject.id}', 0) or 0)
+                exam_score = float(request.POST.get(f'exam_{subject.id}', 0) or 0)
+                total_score = ca_test1 + ca_test2 + exam_score
 
-        messages.success(request, "Results saved successfully!")
-        return redirect(reverse('staff_result_detail', kwargs={'student_id': student.id}))
+                # Validate that total is within acceptable limits
+                if total_score > 100:
+                    messages.warning(request, f"Total score for {subject.name} cannot exceed 100.")
+                    continue
 
+                Result.objects.update_or_create(
+                    student=student,
+                    subject=subject,
+                    term=term,
+                    defaults={
+                        'ca_test1': ca_test1,
+                        'ca_test2': ca_test2,
+                        'exam_score': exam_score,
+                        'total_score': total_score
+                    }
+                )
+
+            messages.success(request, "Results saved successfully!")
+            return redirect('staff_add_result')
+
+        except Exception as e:
+            # ✅ Log the error (for debugging)
+            print(f"Error: {e}")
+            messages.error(request, f"An unexpected error occurred: {e}")
+
+    # ✅ Prepare context for template
     context = {
         'students': students,
-        'subjects': subjects,
         'sessions': sessions,
         'terms': terms,
-        'page_title': page_title,
+        'subjects': subjects,
+        'page_title': 'Add Student Results',
     }
     return render(request, "staff_template/staff_add_result.html", context)
+
 
 
 @csrf_exempt
@@ -489,7 +692,6 @@ def fetch_student_result(request):
     except Exception as e:
         return HttpResponse('False')
 
-
 def staff_student_list(request):
     staff = get_object_or_404(Staff, admin=request.user)
     students = Student.objects.filter(program=staff.program)
@@ -505,57 +707,6 @@ def staff_student_list(request):
     }
     return render(request, 'staff_template/staff_student_list.html', context)
 
-# def staff_view_result_filtered(request):
-#     student_id = request.GET.get('student')
-#     session_id = request.GET.get('session')
-#     term_id = request.GET.get('term')
-#     if not (student_id and session_id and term_id):
-#         messages.error(request, "Please select a student, session, and term.")
-#         return redirect('staff_student_list')
-    
-#     student = get_object_or_404(Student, id=student_id)
-#     session = get_object_or_404(Session, id=session_id)
-#     # Ensure the term belongs to the selected session.
-#     term = get_object_or_404(Term, id=term_id, session=session)
-    
-#     # Retrieve results for this student and term.
-#     results = Result.objects.filter(student=student, term=term)
-#     # Compute summary for this term.
-#     total_score = sum(result.total_score or 0 for result in results)
-#     num_subjects = results.count()
-#     average_score = total_score / num_subjects if num_subjects > 0 else 0
-#     if average_score >= 90:
-#         grade = 'A+'
-#     elif average_score >= 80:
-#         grade = 'A'
-#     elif average_score >= 70:
-#         grade = 'B'
-#     elif average_score >= 60:
-#         grade = 'C'
-#     elif average_score >= 50:
-#         grade = 'D'
-#     else:
-#         grade = 'F'
-    
-#     # Prepare a summary dictionary.
-#     summary = {
-#         'total_score': total_score,
-#         'average_score': round(average_score, 2),
-#         'grade': grade,
-#         'teacher_remarks': '',  # You can later modify this to fetch remarks if stored.
-#     }
-    
-#     context = {
-#         'student': student,
-#         'session': session,
-#         'term': term,
-#         'results': results,
-#         'summary': summary,
-#         'page_title': "Filtered Student Result",
-#     }
-#     return render(request, 'staff_template/staff_result_detail_filtered.html', context)
-from django.db.models import Count
-
 def staff_view_result_filtered(request):
     student_id = request.GET.get('student')
     session_id = request.GET.get('session')
@@ -569,31 +720,27 @@ def staff_view_result_filtered(request):
     session = get_object_or_404(Session, id=session_id)
     term = get_object_or_404(Term, id=term_id, session=session)
 
-    # Fetch the student's results
+    # Get number of students in the same program
+    no_in_class = Student.objects.filter(program=student.program).count()
+
+    # Get term details
+    resumption_date = term.resumption_date if hasattr(term, 'resumption_date') else "N/A"
+    days_in_term = term.days_in_term if hasattr(term, 'days_in_term') else 0
+
+    # Get student's attendance in this session & term
+    attendance = Attendance.objects.filter(student=student, session=session, term=term, is_present=True).count()
+
+    # Get all results for this student in this term
     results = Result.objects.filter(student=student, term=term)
 
-    # **No of Days in Term**: Count unique attendance records for this session & term
-    total_days_in_term = Attendance.objects.filter(session=session, term=term).count()
+    # Calculate Grand Total Score
+    total_score = sum(result.total_score for result in results)
 
-    # **Attendance**: Count how many times the student was marked **present**
-    total_attendance = AttendanceReport.objects.filter(
-        student=student,
-        attendance__session=session,
-        attendance__term=term,
-        status=True  # Only count when present
-    ).count()
-
-    # **No in Class**: Total students in the same program
-    total_students_in_class = Student.objects.filter(program=student.program).count()
-
-    # **Resumption Date**: Assuming session has a `start_date`
-    resumption_date = session.start_date if hasattr(session, 'start_date') else "N/A"
-
-    # **Compute Total Score, Average Score, and Grade**
-    total_score = sum(result.total_score or 0 for result in results)
+    # Calculate Final Average Score
     num_subjects = results.count()
     average_score = total_score / num_subjects if num_subjects > 0 else 0
 
+    # Assign Grade Based on Average
     if average_score >= 90:
         grade = 'A+'
     elif average_score >= 80:
@@ -607,46 +754,228 @@ def staff_view_result_filtered(request):
     else:
         grade = 'F'
 
-    # **Position**: Rank the student based on average score
-    rankings = ResultSummary.objects.filter(student__program=student.program, term=term).order_by('-average_score')
-    ranked_students = list(rankings.values_list('student_id', flat=True))
-    position = ranked_students.index(student.id) + 1 if student.id in ranked_students else "N/A"
+    # Get the student's position in the class for the term
+    position = (
+        ResultSummary.objects.filter(term=term, average_score__gt=average_score)
+        .count() + 1
+    )
 
-    # **Ensure Teacher's Remarks is Set**
+    # Update or Create the Result Summary
     summary, created = ResultSummary.objects.get_or_create(
         student=student,
         term=term,
         defaults={
             'total_score': total_score,
             'average_score': average_score,
-            'position': position,
             'grade': grade,
-            'teacher_remarks': 'No remarks yet'
+            'position': position,
+            'attendance': attendance, 
+            'days_in_term': days_in_term if days_in_term else 0,
+            'resumption_date': resumption_date
         }
     )
 
     if not created:
         summary.total_score = total_score
         summary.average_score = average_score
-        summary.position = position
         summary.grade = grade
+        summary.position = position
+        summary.attendance = attendance
         summary.save()
 
-    # **Pass everything to the template**
     context = {
         'student': student,
         'session': session,
         'term': term,
         'results': results,
         'summary': summary,
-        'total_days_in_term': total_days_in_term,
-        'total_attendance': total_attendance,
-        'total_students_in_class': total_students_in_class,
-        'resumption_date': resumption_date,
-        'position': position,
+        'no_in_class': no_in_class,
+        'attendance': summary.attendance if summary.attendance is not None else 0,  # ✅ Default to 0
+        'days_in_term': summary.days_in_term if summary.days_in_term is not None else 0,  # ✅ Default to 0
+        'resumption_date': summary.resumption_date if summary.resumption_date else "N/A",
         'page_title': "Filtered Student Result",
     }
+
     return render(request, 'staff_template/staff_result_detail_filtered.html', context)
+
+# def staff_view_result_filtered(request):
+#     # Get parameters from request
+#     student_id = request.GET.get('student')
+#     session_id = request.GET.get('session')
+#     term_id = request.GET.get('term')
+
+#     if not (student_id and session_id and term_id):
+#         messages.error(request, "Please select a student, session, and term.")
+#         return redirect('staff_student_list')
+
+#     # Get relevant objects
+#     student = get_object_or_404(Student, id=student_id)
+#     session = get_object_or_404(Session, id=session_id)
+#     term = get_object_or_404(Term, id=term_id, session=session)
+
+#     # Get number of students in the same class/program
+#     no_in_class = Student.objects.filter(program=student.program).count()
+
+#     # Get term details with safe defaults
+#     resumption_date = getattr(term, 'resumption_date', "N/A")
+#     days_in_term = getattr(term, 'days_in_term', 0)
+
+#     # ✅ Get student's attendance in this session & term
+#     attendance = Attendance.objects.filter(
+#         student=student, session=session, term=term, is_present=True
+#     ).count()
+
+#     # ✅ Get all results for this student in this term
+#     results = Result.objects.filter(student=student, term=term)
+    
+#     # ✅ Defensive check to avoid sum() errors
+#     total_score = sum(result.total_score or 0 for result in results)
+    
+#     # ✅ Calculate Final Average Score
+#     num_subjects = results.count()
+#     average_score = total_score / num_subjects if num_subjects > 0 else 0
+
+#     # ✅ Assign Grade Based on Average
+#     if average_score >= 90:
+#         grade = 'A+'
+#     elif average_score >= 80:
+#         grade = 'A'
+#     elif average_score >= 70:
+#         grade = 'B'
+#     elif average_score >= 60:
+#         grade = 'C'
+#     elif average_score >= 50:
+#         grade = 'D'
+#     else:
+#         grade = 'F'
+
+#     # ✅ Get the student's position based on average score
+#     position = (
+#         ResultSummary.objects.filter(term=term, average_score__gt=average_score)
+#         .count() + 1
+#     )
+
+#     # ✅ Update or Create the Result Summary
+#     summary, created = ResultSummary.objects.update_or_create(
+#         student=student,
+#         term=term,
+#         defaults={
+#             'total_score': total_score,
+#             'average_score': average_score,
+#             'grade': grade,
+#             'position': position,
+#             'attendance': attendance,
+#             'days_in_term': days_in_term,
+#             'resumption_date': resumption_date,
+#         }
+#     )
+
+#     # ✅ Prepare Context for Template
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'term': term,
+#         'results': results,
+#         'summary': summary,
+#         'no_in_class': no_in_class,
+#         'attendance': summary.attendance or 0,
+#         'days_in_term': summary.days_in_term or 0,
+#         'resumption_date': summary.resumption_date or "N/A",
+#         'page_title': "Filtered Student Result",
+#     }
+
+#     return render(request, 'staff_template/staff_result_detail_filtered.html', context)
+# def staff_view_result_filtered(request):
+#     # Get parameters from request
+#     student_id = request.GET.get('student')
+#     session_id = request.GET.get('session')
+#     term_id = request.GET.get('term')
+
+#     if not (student_id and session_id and term_id):
+#         messages.error(request, "Please select a student, session, and term.")
+#         return redirect('staff_student_list')
+
+#     # Get relevant objects
+#     student = get_object_or_404(Student, id=student_id)
+#     session = get_object_or_404(Session, id=session_id)
+#     term = get_object_or_404(Term, id=term_id, session=session)
+
+#     # Get number of students in the same class/program
+#     no_in_class = Student.objects.filter(program=student.program).count()
+
+#     # Get term details with None as fallback
+#     resumption_date = getattr(term, 'resumption_date', None)
+#     days_in_term = getattr(term, 'days_in_term', 0)
+
+#     # ✅ Get student's attendance in this session & term
+#     attendance = Attendance.objects.filter(
+#         student=student, session=session, term=term, is_present=True
+#     ).count()
+
+#     # ✅ Get all results for this student in this term
+#     results = Result.objects.filter(student=student, term=term)
+    
+#     # ✅ Defensive check to avoid sum() errors
+#     total_score = sum(result.total_score or 0 for result in results)
+    
+#     # ✅ Calculate Final Average Score
+#     num_subjects = results.count()
+#     average_score = total_score / num_subjects if num_subjects > 0 else 0
+
+#     # ✅ Assign Grade Based on Average
+#     if average_score >= 90:
+#         grade = 'A+'
+#     elif average_score >= 80:
+#         grade = 'A'
+#     elif average_score >= 70:
+#         grade = 'B'
+#     elif average_score >= 60:
+#         grade = 'C'
+#     elif average_score >= 50:
+#         grade = 'D'
+#     else:
+#         grade = 'F'
+
+#     # ✅ Get the student's position based on average score
+#     position = (
+#         ResultSummary.objects.filter(term=term, average_score__gt=average_score)
+#         .count() + 1
+#     )
+
+#     # ✅ Update or Create the Result Summary
+#     summary, created = ResultSummary.objects.update_or_create(
+#         student=student,
+#         term=term,
+#         defaults={
+#             'total_score': total_score,
+#             'average_score': average_score,
+#             'grade': grade,
+#             'position': position,
+#             'attendance': attendance,
+#             'days_in_term': days_in_term,
+#             'resumption_date': resumption_date,
+#         }
+#     )
+
+#     # ✅ Prepare Context for Template
+#     context = {
+#         'student': student,
+#         'session': session,
+#         'term': term,
+#         'results': results,
+#         'summary': summary,
+#         'no_in_class': no_in_class,
+#         'attendance': summary.attendance or 0,
+#         'days_in_term': summary.days_in_term or 0,
+#         'resumption_date': summary.resumption_date,
+#         'page_title': "Filtered Student Result",
+#     }
+
+#     return render(request, 'staff_template/staff_result_detail_filtered.html', context)
+
+
+
+
 
 
 # ------------------------------
@@ -748,7 +1077,6 @@ class EditResultView(View):
         }
         return render(request, "staff_template/edit_student_result.html", context)
 
-
 def compile_session_results(request, student_id, session_id):
     student = get_object_or_404(Student, id=student_id)
     session = get_object_or_404(Session, id=session_id)
@@ -773,7 +1101,6 @@ def compile_session_results(request, student_id, session_id):
     }
     return render(request, "staff_template/compiled_session_results.html", context)
 
-
 def staff_delete_result(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     try:
@@ -783,7 +1110,6 @@ def staff_delete_result(request, student_id):
     except Exception as e:
         messages.error(request, "Could not delete results: " + str(e))
     return redirect('staff_student_list')
-
 
 def compute_result_summary(student):
     results = Result.objects.filter(student=student)
@@ -808,19 +1134,42 @@ def compute_result_summary(student):
     else:
         return 0, 0, 0, 'F'
 
-
+# ////////////////////////////////////////////////////////////
 def staff_result_detail(request, student_id):
     student = get_object_or_404(Student, id=student_id)
     results = Result.objects.filter(student=student)
+
+    # Calculate total and average score
     total_score = sum(result.total_score or 0 for result in results)
     num_subjects = results.count()
     average_score = total_score / num_subjects if num_subjects > 0 else 0
-    summaries = ResultSummary.objects.filter(student__program=student.program).order_by('-average_score')
-    ranked_ids = list(summaries.values_list('student__id', flat=True))
-    if student.id in ranked_ids:
-        position = ranked_ids.index(student.id) + 1
-    else:
-        position = 1
+ 
+    # Get the latest term
+    latest_term = Term.objects.filter(
+        session__student=student
+    ).order_by('-session__start_year').first()
+
+    if not latest_term:
+        messages.error(request, "No term found for this student!")
+        return redirect('staff_student_list')
+
+    # Only get summaries for the same session and term
+    summaries = ResultSummary.objects.filter(
+        student__program=student.program,
+        term=latest_term
+    ).order_by('-average_score', 'student__admin__first_name')  # Sort by score, then by name
+
+    # Determine Position Based on Average Score
+    ranked_students = list(summaries)
+    position = 1  # Default position if no other students
+
+    for index, summary in enumerate(ranked_students):
+        if summary.student == student:
+            position = index + 1  # Positions start from 1
+            break
+
+    # Determine Grade
+    grade = 'F'
     if average_score >= 90:
         grade = 'A+'
     elif average_score >= 80:
@@ -831,10 +1180,11 @@ def staff_result_detail(request, student_id):
         grade = 'C'
     elif average_score >= 50:
         grade = 'D'
-    else:
-        grade = 'F'
+
+    # ✅ Create or Update the ResultSummary
     summary, created = ResultSummary.objects.get_or_create(
         student=student,
+        term=latest_term,
         defaults={
             'total_score': total_score,
             'average_score': average_score,
@@ -843,12 +1193,15 @@ def staff_result_detail(request, student_id):
             'teacher_remarks': ''
         }
     )
+
+    # Update summary if already exists
     if not created:
         summary.total_score = total_score
         summary.average_score = average_score
         summary.position = position
         summary.grade = grade
         summary.save()
+
     context = {
         'student': student,
         'results': results,
@@ -856,6 +1209,7 @@ def staff_result_detail(request, student_id):
         'page_title': "Student Result Detail",
     }
     return render(request, 'staff_template/staff_result_detail.html', context)
+
 
 
 from weasyprint import HTML, CSS
@@ -903,21 +1257,399 @@ def staff_result_pdf(request, student_id):
     response['Content-Disposition'] = f'inline; filename="result_{student.id}.pdf"'
     return response
 
-
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-
 @csrf_exempt
 def get_terms(request):
-    session_id = request.POST.get('session')
-    try:
+    """Fetch terms only for the selected session."""
+    session_id = request.POST.get('session')  # Get session ID from AJAX request
+    if session_id:
+        terms = Term.objects.filter(session_id=session_id)  # Filter terms by session
+        data = [{'id': term.id, 'name': term.name} for term in terms]
+        return JsonResponse(data, safe=False)
+    
+    return JsonResponse([], safe=False)  # Return empty list if no session selected
+
+
+
+
+# def staff_student_attendance(request):
+#     """
+#     Display the student attendance page with session and term selection.
+#     Only students in the staff's program are shown.
+#     """
+#     # Get the current staff user
+#     staff = get_object_or_404(Staff, admin=request.user)
+#     # Filter students by the staff's program
+#     students = Student.objects.filter(program=staff.program)
+    
+#     sessions = Session.objects.all()
+#     terms = Term.objects.all()
+    
+#     # Get the selected session and term from the GET parameters
+#     selected_session_id = request.GET.get("session")
+#     selected_term_id = request.GET.get("term")
+    
+#     if selected_session_id and selected_term_id:
+#         selected_session = get_object_or_404(Session, id=selected_session_id)
+#         selected_term = get_object_or_404(Term, id=selected_term_id, session=selected_session)
+#         # Get attendance records for the selected session and term.
+#         attendance_data = Attendance.objects.filter(session=selected_session, term=selected_term)
+#     else:
+#         attendance_data = None
+
+#     context = {
+#         "students": students,
+#         "sessions": sessions,
+#         "terms": terms,
+#         "attendance_data": attendance_data,
+#         "selected_session_id": selected_session_id,
+#         "selected_term_id": selected_term_id
+#     }
+#     return render(request, "staff_template/staff_student_attendance.html", context)
+
+# @csrf_exempt
+# def bulk_mark_attendance(request):
+#     """
+#     AJAX view to mark attendance for a given student, session, and term.
+#     """
+#     from django.utils import timezone
+#     if request.method == "POST":
+#         student_id = request.POST.get("student_id")
+#         session_id = request.POST.get("session_id")
+#         term_id = request.POST.get("term_id")
+#         is_present = request.POST.get("is_present") == "true"  # convert string to boolean
+
+#         student = get_object_or_404(Student, id=student_id)
+#         session = get_object_or_404(Session, id=session_id)
+#         term = get_object_or_404(Term, id=term_id, session=session)
+
+#         # Create or update the attendance record for today
+#         attendance, created = Attendance.objects.get_or_create(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=timezone.now().date()
+#         )
+#         attendance.is_present = is_present
+#         attendance.save()
+
+#         # Count total days the student was present in this session & term
+#         total_attendance = Attendance.objects.filter(
+#             student=student, session=session, term=term, is_present=True
+#         ).count()
+
+#         return JsonResponse({"success": True, "attendance_count": total_attendance})
+    
+#     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+# staff_views.py
+from django.shortcuts import get_object_or_404, render, redirect, reverse
+from django.http import JsonResponse
+from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from .models import Student, Session, Term, Attendance, Staff
+
+def staff_student_attendance(request):
+    """
+    Display the student attendance page.
+    Staff can select a session and term to load students in their program.
+    """
+    # Get current staff profile
+    staff = get_object_or_404(Staff, admin=request.user)
+    # Only students in the staff’s program
+    students = Student.objects.filter(program=staff.program)
+    sessions = Session.objects.all()
+    terms = Term.objects.all()
+
+    selected_session_id = request.GET.get("session")
+    selected_term_id = request.GET.get("term")
+
+    if selected_session_id and selected_term_id:
+        selected_session = get_object_or_404(Session, id=selected_session_id)
+        selected_term = get_object_or_404(Term, id=selected_term_id, session=selected_session)
+        # Filter attendance records for the selected session and term
+        attendance_data = Attendance.objects.filter(
+            session=selected_session,
+            term=selected_term
+        )
+    else:
+        attendance_data = None
+
+    context = {
+        "students": students,
+        "sessions": sessions,
+        "terms": terms,
+        "attendance_data": attendance_data,
+        "selected_session_id": selected_session_id,
+        "selected_term_id": selected_term_id,
+        "page_title": "Student Attendance"
+    }
+    return render(request, "staff_template/staff_student_attendance.html", context)
+
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from .models import Student, Session, Term, Attendance
+
+@csrf_exempt
+def bulk_mark_attendance(request):
+    """
+    Mark attendance for multiple students via AJAX.
+    """
+    if request.method == "POST":
+        student_id = request.POST.get("student_id")
+        session_id = request.POST.get("session_id")
+        term_id = request.POST.get("term_id")
+        is_present = request.POST.get("is_present") == "true"
+
+        print("Received Data:", student_id, session_id, term_id, is_present)  # Debugging
+
+        if not (student_id and session_id and term_id):
+            return JsonResponse({"success": False, "error": "Missing required data"}, status=400)
+
+        student = get_object_or_404(Student, id=student_id)
         session = get_object_or_404(Session, id=session_id)
-        # Retrieve terms related to the session
-        terms = session.terms.all()  # Assumes you set related_name='terms' in the Term model's session field.
-        terms_data = [{
-            'id': term.id,
-            'name': term.name  # e.g., "1st", "2nd", "3rd"
-        } for term in terms]
-        return JsonResponse(terms_data, safe=False)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        term = get_object_or_404(Term, id=term_id, session=session)
+
+        attendance, created = Attendance.objects.get_or_create(
+            student=student,
+            session=session,
+            term=term,
+            date=timezone.now().date()
+        )
+        attendance.is_present = is_present
+        attendance.save()
+
+        total_attendance = Attendance.objects.filter(
+            student=student, session=session, term=term, is_present=True
+        ).count()
+
+        return JsonResponse({"success": True, "attendance_count": total_attendance})
+
+    return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+# @csrf_exempt
+# def bulk_mark_attendance(request):
+#     """
+#     Mark attendance for a single student via AJAX.
+#     Expects POST data: student_id, session_id, term_id, and is_present.
+#     """
+#     if request.method == "POST":
+#         student_id = request.POST.get("student_id")
+#         session_id = request.POST.get("session_id")
+#         term_id = request.POST.get("term_id")
+#         # Convert "true"/"false" string to boolean:
+#         is_present = request.POST.get("is_present") == "true"
+
+#         student = get_object_or_404(Student, id=student_id)
+#         session = get_object_or_404(Session, id=session_id)
+#         term = get_object_or_404(Term, id=term_id, session=session)
+
+#         # Create or update today's attendance record for this student, session and term.
+#         attendance, created = Attendance.objects.get_or_create(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=timezone.now().date()
+#         )
+#         attendance.is_present = is_present
+#         attendance.save()
+
+#         # Count the total number of days this student was present in this session and term.
+#         total_attendance = Attendance.objects.filter(
+#             student=student, session=session, term=term, is_present=True
+#         ).count()
+
+#         return JsonResponse({"success": True, "attendance_count": total_attendance})
+
+#     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+
+
+# @csrf_exempt
+# def mark_attendance(request):
+#     """Mark student attendance for the selected session and term."""
+#     if request.method == "POST":
+#         student_id = request.POST.get("student_id")
+#         session_id = request.POST.get("session_id")
+#         term_id = request.POST.get("term_id")
+#         is_present = request.POST.get("is_present") == "true"
+
+#         student = get_object_or_404(Student, id=student_id)
+#         session = get_object_or_404(Session, id=session_id)
+#         term = get_object_or_404(Term, id=term_id, session=session)
+
+#         # We assume one attendance record per student per day per session/term.
+#         today = timezone.now().date()
+#         attendance, created = Attendance.objects.get_or_create(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=today,
+#             defaults={'is_present': is_present}
+#         )
+#         if not created:
+#             attendance.is_present = is_present
+#             attendance.save()
+
+#         # Count total present for the student for today
+#         attendance_count = Attendance.objects.filter(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=today,
+#             is_present=True
+#         ).count()
+
+#         return JsonResponse({"success": True, "attendance_count": attendance_count})
+
+#     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+# @csrf_exempt
+# def mark_attendance(request):
+#     """Mark student attendance for a selected session and term."""
+#     if request.method == "POST":
+#         student_id = request.POST.get("student_id")
+#         session_id = request.POST.get("session_id")
+#         term_id = request.POST.get("term_id")
+#         is_present = request.POST.get("is_present") == "true"
+
+#         # Debugging: Log received data
+#         print(f"📌 Received: Student ID: {student_id}, Session ID: {session_id}, Term ID: {term_id}, Present: {is_present}")
+
+#         # Check for missing data
+#         if not student_id or not session_id or not term_id:
+#             return JsonResponse({"success": False, "error": "Missing required data"}, status=400)
+
+#         # Fetch student and check if they exist
+#         try:
+#             student = Student.objects.get(id=student_id)
+#         except Student.DoesNotExist:
+#             return JsonResponse({"success": False, "error": "Student not found"}, status=404)
+
+#         session = get_object_or_404(Session, id=session_id)
+#         term = get_object_or_404(Term, id=term_id, session=session)
+
+#         # Create or update attendance
+#         attendance, created = Attendance.objects.get_or_create(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=timezone.now()
+#         )
+#         attendance.is_present = is_present
+#         attendance.save()
+
+#         # Count total attendance records for the student in this session and term
+#         total_attendance = Attendance.objects.filter(
+#             student=student, session=session, term=term, is_present=True
+#         ).count()
+
+#         return JsonResponse({"success": True, "attendance_count": total_attendance})
+
+#     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+# @csrf_exempt
+# def mark_attendance(request):
+#     """Mark student attendance for a selected session and term."""
+#     if request.method == "POST":
+#         student_id = request.POST.get("student_id")
+#         session_id = request.POST.get("session_id")
+#         term_id = request.POST.get("term_id")
+#         is_present = request.POST.get("is_present") == "true"
+
+#         # 🚨 Debugging: Log received data
+#         print(f"📌 Received Data - Student ID: {student_id}, Session ID: {session_id}, Term ID: {term_id}, Present: {is_present}")
+
+#         # Check if required data is missing
+#         if not student_id or not session_id or not term_id:
+#             print("❌ Error: Missing required data")
+#             return JsonResponse({"success": False, "error": "Missing required data"}, status=400)
+
+#         try:
+#             student = Student.objects.get(id=student_id)
+#         except Student.DoesNotExist:
+#             print("❌ Error: Student not found")
+#             return JsonResponse({"success": False, "error": "Student not found"}, status=404)
+
+#         session = get_object_or_404(Session, id=session_id)
+#         term = get_object_or_404(Term, id=term_id, session=session)
+
+#         # Create or update attendance
+#         attendance, created = Attendance.objects.get_or_create(
+#             student=student,
+#             session=session,
+#             term=term,
+#             date=timezone.now()
+#         )
+#         attendance.is_present = is_present
+#         attendance.save()
+
+#         # Count total attendance records for the student in this session and term
+#         total_attendance = Attendance.objects.filter(
+#             student=student, session=session, term=term, is_present=True
+#         ).count()
+
+#         print(f"✅ Attendance marked successfully for {student.admin.first_name}. Total Days Present: {total_attendance}")
+#         return JsonResponse({"success": True, "attendance_count": total_attendance})
+
+#     print("❌ Error: Invalid request method")
+#     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+
+@csrf_exempt
+def mark_attendance(request):
+    """Mark student attendance as Present or Absent."""
+    if request.method == "POST":
+        student_id = request.POST.get("student_id")
+        session_id = request.POST.get("session_id")
+        term_id = request.POST.get("term_id")
+        status = request.POST.get("status")  # "present" or "absent"
+
+        # 🚨 Debugging: Log received data
+        print(f"📌 Received Data - Student ID: {student_id}, Session ID: {session_id}, Term ID: {term_id}, Status: {status}")
+
+        # Check if required data is missing
+        if not student_id or not session_id or not term_id or not status:
+            return JsonResponse({"success": False, "error": "Missing required data"}, status=400)
+
+        try:
+            student = Student.objects.get(id=student_id)
+        except Student.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Student not found"}, status=404)
+
+        session = get_object_or_404(Session, id=session_id)
+        term = get_object_or_404(Term, id=term_id, session=session)
+
+        # Retrieve or create attendance record
+        attendance, created = Attendance.objects.get_or_create(
+            student=student,
+            session=session,
+            term=term,
+            date=timezone.now()
+        )
+
+        # Update attendance based on the checkbox clicked
+        if status == "present":
+            attendance.is_present = True
+            attendance.is_absent = False  # Reset Absent if Present is checked
+        elif status == "absent":
+            attendance.is_absent = True
+            attendance.is_present = False  # Reset Present if Absent is checked
+
+        attendance.save()
+
+        # Count total Present and Absent records
+        total_present = Attendance.objects.filter(
+            student=student, session=session, term=term, is_present=True
+        ).count()
+
+        total_absent = Attendance.objects.filter(
+            student=student, session=session, term=term, is_absent=True
+        ).count()
+
+        return JsonResponse({"success": True, "present_count": total_present, "absent_count": total_absent})
+
+    return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
