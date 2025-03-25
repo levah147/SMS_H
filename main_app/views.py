@@ -130,3 +130,83 @@ def showFirebaseJS(request):
     });
     """
     return HttpResponse(data, content_type='application/javascript')
+
+
+# from django.shortcuts import render, redirect
+# from django.contrib import messages
+# from django.core.mail import send_mail
+# from django.contrib.auth.models import User
+# from django.contrib.auth.tokens import default_token_generator
+# from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+# from django.utils.encoding import force_bytes, force_str
+# import uuid
+
+# def password_reset_request(request):
+#     if request.method == 'POST':
+#         email = request.POST.get('email')
+#         try:
+#             # Find user by email
+#             user = User.objects.get(email=email)
+            
+#             # Generate unique token
+#             token = str(uuid.uuid4())
+            
+#             # Store token with user (you might want to create a separate model for this)
+#             user.profile.reset_token = token
+#             user.profile.save()
+            
+#             # Construct reset link
+#             reset_link = f"http://{request.get_host()}/password-reset-confirm/{urlsafe_base64_encode(force_bytes(user.pk))}/{token}/"
+            
+#             # Send email
+#             send_mail(
+#                 'Password Reset Request',
+#                 f'Click the following link to reset your password: {reset_link}',
+#                 'noreply@hibiscusacademy.com',
+#                 [email],
+#                 fail_silently=False,
+#             )
+            
+#             messages.success(request, 'Password reset link has been sent to your email.')
+#             return redirect('login_page')
+        
+#         except User.DoesNotExist:
+#             messages.error(request, 'No account found with this email address.')
+    
+#     return render(request, 'main_apppassword_reset_request.html')
+
+# def password_reset_confirm(request, uidb64, token):
+    try:
+        # Decode user ID
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+        
+        # Check if token matches
+        if user.profile.reset_token != token:
+            messages.error(request, 'Invalid or expired reset link.')
+            return redirect('login_page')
+        
+        if request.method == 'POST':
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            
+            if new_password != confirm_password:
+                messages.error(request, 'Passwords do not match.')
+                return render(request, 'password_reset_confirm.html', {'uidb64': uidb64, 'token': token})
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            # Clear reset token
+            user.profile.reset_token = None
+            user.profile.save()
+            
+            messages.success(request, 'Password reset successful. You can now log in.')
+            return redirect('login_page')
+        
+        return render(request, 'password_reset_confirm.html', {'uidb64': uidb64, 'token': token})
+    
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        messages.error(request, 'Invalid reset link.')
+        return redirect('login_page')

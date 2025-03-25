@@ -13,6 +13,9 @@ urlpatterns = [
     path("logout_user/", views.logout_user, name='user_logout'),
     path("staff/mark-attendance/", staff_views.mark_attendance, name="mark_attendance"),  # Ensure this exists
     path("staff/calculate-days-in-term/", staff_views.calculate_days_in_term, name="calculate_days_in_term"),
+    # path('password-reset/', views.password_reset_request, name='password_reset2'),
+    # path('password-reset-confirm/<uidb64>/<token>/', views.password_reset_confirm, name='password_reset_confirm'),
+
 
 
 
